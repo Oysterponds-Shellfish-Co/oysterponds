@@ -1,0 +1,180 @@
+@import './styles/variables.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Oysterponds Shellfish Co. Design System
+   Primary Brand Color: #58869A (Ocean Teal)
+   All colors in HSL format
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 200 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 200 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 15% 15%;
+
+    /* Ocean Teal Primary - #58869A */
+    --primary: 197 27% 47%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 197 15% 92%;
+    --secondary-foreground: 197 30% 38%;
+
+    --muted: 200 10% 96%;
+    --muted-foreground: 200 10% 45%;
+
+    --accent: 197 20% 88%;
+    --accent-foreground: 197 30% 35%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 200 15% 88%;
+    --input: 200 15% 88%;
+    --ring: 197 27% 47%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Ocean Teal Theme */
+    --sidebar-background: 197 25% 18%;
+    --sidebar-foreground: 197 15% 92%;
+    --sidebar-primary: 197 27% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 197 20% 25%;
+    --sidebar-accent-foreground: 197 15% 92%;
+    --sidebar-border: 197 20% 25%;
+    --sidebar-ring: 197 27% 60%;
+
+    /* Status Colors */
+    --status-pending: 45 93% 47%;
+    --status-confirmed: 142 71% 45%;
+    --status-delivered: 197 27% 47%;
+    --status-cancelled: 0 84% 60%;
+
+    /* Chart Colors */
+    --chart-1: 197 27% 47%;
+    --chart-2: 197 25% 60%;
+    --chart-3: 38 35% 70%;
+    --chart-4: 142 71% 45%;
+    --chart-5: 45 93% 47%;
+  }
+
+  .dark {
+    --background: 200 15% 10%;
+    --foreground: 197 15% 92%;
+
+    --card: 200 15% 12%;
+    --card-foreground: 197 15% 92%;
+
+    --popover: 200 15% 12%;
+    --popover-foreground: 197 15% 92%;
+
+    --primary: 197 27% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 197 20% 20%;
+    --secondary-foreground: 197 15% 85%;
+
+    --muted: 200 15% 18%;
+    --muted-foreground: 200 10% 60%;
+
+    --accent: 197 20% 22%;
+    --accent-foreground: 197 15% 90%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 200 15% 20%;
+    --input: 200 15% 20%;
+    --ring: 197 27% 55%;
+
+    --sidebar-background: 197 25% 12%;
+    --sidebar-foreground: 197 15% 92%;
+    --sidebar-primary: 197 27% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 197 20% 18%;
+    --sidebar-accent-foreground: 197 15% 92%;
+    --sidebar-border: 197 20% 18%;
+    --sidebar-ring: 197 27% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out forwards;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out forwards;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out forwards;
+  }
+
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes scale-in {
+  from { 
+    opacity: 0; 
+    transform: scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

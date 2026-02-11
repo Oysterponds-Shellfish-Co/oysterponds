@@ -1,0 +1,23 @@
+/* Oysterponds Shellfish Co. Brand Variables */
+/* Primary Brand Color: #58869A (Ocean Teal) */
+/* HSL: 197 27% 47% */
+
+:root {
+  /* Brand Colors - Ocean Teal Palette */
+  --ocean-teal: 197 27% 47%;
+  --ocean-teal-dark: 197 30% 38%;
+  --ocean-teal-light: 197 25% 60%;
+  --ocean-teal-lighter: 197 20% 75%;
+  --ocean-teal-pale: 197 15% 92%;
+  
+  /* Accent Colors */
+  --sand: 38 35% 85%;
+  --sand-dark: 38 30% 70%;
+  --shell-white: 40 20% 98%;
+  
+  /* Status Colors */
+  --status-pending: 45 93% 47%;
+  --status-confirmed: 142 71% 45%;
+  --status-delivered: 197 27% 47%;
+  --status-cancelled: 0 84% 60%;
+}
