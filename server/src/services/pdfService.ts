@@ -5,11 +5,11 @@ import fs from 'fs';
 // Load logo as base64 data URL
 const getLogoBase64 = (): string => {
     try {
-        const logoPath = path.join(process.cwd(), 'src', 'templates', 'logo.jpeg');
+        const logoPath = path.join(process.cwd(), 'src', 'templates', 'logo.png');
         if (fs.existsSync(logoPath)) {
             const logoBuffer = fs.readFileSync(logoPath);
             const base64 = logoBuffer.toString('base64');
-            return `data:image/jpeg;base64,${base64}`;
+            return `data:image/png;base64,${base64}`;
         }
     } catch (error) {
         console.error('Error loading logo:', error);
@@ -106,7 +106,7 @@ const generateInvoiceHTML = (data: InvoiceData): string => {
 
     // Logo HTML - only include if logo exists
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="Oysterponds Logo" style="width: 140px; height: auto; background-color: white;" />`
+        ? `<img src="${logoBase64}" alt="Oysterponds Logo" style="width: 140px; height: auto;" />`
         : '';
 
 
@@ -468,7 +468,7 @@ interface ShippingTagData {
 const generateShippingTagHTML = (data: ShippingTagData): string => {
     const logoBase64 = getLogoBase64();
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="Logo" style="width: 120px; height: auto; background-color: white;" />`
+        ? `<img src="${logoBase64}" alt="Logo" style="width: 120px; height: auto;" />`
         : '';
 
     const itemsList = data.items
