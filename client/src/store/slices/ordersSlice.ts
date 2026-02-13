@@ -137,6 +137,19 @@ export const deleteOrder = createAsyncThunk(
     }
 );
 
+export const updateOrder = createAsyncThunk(
+    'orders/updateOrder',
+    async ({ id, order }: { id: string; order: any }, { rejectWithValue }) => {
+        try {
+            const response = await api.put<ApiResponse<IOrder>>(`/orders/${id}`, order);
+            return response.data.data;
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { error?: string } }; message?: string };
+            return rejectWithValue(err.response?.data?.error || 'Failed to update order');
+        }
+    }
+);
+
 const ordersSlice = createSlice({
     name: 'orders',
     initialState,
@@ -220,6 +233,18 @@ const ordersSlice = createSlice({
             })
             // Update order status
             .addCase(updateOrderStatus.fulfilled, (state, action: PayloadAction<IOrder | undefined>) => {
+                if (action.payload) {
+                    const index = state.items.findIndex((o) => o._id === action.payload!._id);
+                    if (index !== -1) {
+                        state.items[index] = action.payload;
+                    }
+                    if (state.selectedOrder?._id === action.payload._id) {
+                        state.selectedOrder = action.payload;
+                    }
+                }
+            })
+            // Update order
+            .addCase(updateOrder.fulfilled, (state, action: PayloadAction<IOrder | undefined>) => {
                 if (action.payload) {
                     const index = state.items.findIndex((o) => o._id === action.payload!._id);
                     if (index !== -1) {

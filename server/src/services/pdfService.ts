@@ -106,7 +106,7 @@ const generateInvoiceHTML = (data: InvoiceData): string => {
 
     // Logo HTML - only include if logo exists
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="Oysterponds Logo" style="width: 100px; height: auto; border-radius: 4px;" />`
+        ? `<img src="${logoBase64}" alt="Oysterponds Logo" style="width: 140px; height: auto; background-color: white;" />`
         : '';
 
 
@@ -269,7 +269,7 @@ const generateInvoiceHTML = (data: InvoiceData): string => {
         <div class="invoice-container">
             <!-- Header -->
             <div class="header">
-                <div style="width: 100px;">${logoHtml}</div>
+                <div style="width: 140px;">${logoHtml}</div>
                 <div class="company-info">
                     <div class="company-name">OYSTERPONDS SHELLFISH CO.</div>
                     <div class="company-details">
@@ -468,7 +468,7 @@ interface ShippingTagData {
 const generateShippingTagHTML = (data: ShippingTagData): string => {
     const logoBase64 = getLogoBase64();
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="Logo" style="width: 80px; height: auto;" />`
+        ? `<img src="${logoBase64}" alt="Logo" style="width: 120px; height: auto; background-color: white;" />`
         : '';
 
     const itemsList = data.items

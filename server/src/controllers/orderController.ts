@@ -234,20 +234,56 @@ export const updateOrder = asyncHandler(async (req: Request, res: Response): Pro
         throw new AppError('Order not found', 404);
     }
 
-    // Don't allow updates to delivered or cancelled orders
-    if (order.status === 'delivered' || order.status === 'cancelled') {
-        throw new AppError(`Cannot update ${order.status} orders`, 400);
+    const { items, customer, deliveryDate, ...otherUpdates } = req.body;
+
+    // If customer is changing, update customer info
+    if (customer && customer.toString() !== order.customer.toString()) {
+        const customerDoc = await Customer.findById(customer);
+        if (!customerDoc) throw new AppError('Customer not found', 404);
+        order.customer = customer;
+        order.customerName = customerDoc.businessName;
     }
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-        req.params.id,
-        req.body,
-        { new: true, runValidators: true }
-    );
+    // Process items if they are changing
+    if (items) {
+        if (items.length === 0) {
+            throw new AppError('Order must have at least one item', 400);
+        }
+
+        const processedItems = await Promise.all(
+            items.map(async (item: any) => {
+                const product = await Product.findById(item.product);
+                if (!product) {
+                    throw new AppError(`Product not found: ${item.product}`, 404);
+                }
+
+                const pricePerUnit = item.pricePerUnit !== undefined ? item.pricePerUnit : product.basePrice;
+                const lineTotal = item.quantity * pricePerUnit;
+
+                return {
+                    product: product._id,
+                    productName: product.name,
+                    quantity: item.quantity,
+                    pricePerUnit,
+                    lineTotal,
+                };
+            })
+        );
+        order.items = processedItems as any;
+    }
+
+    if (deliveryDate) {
+        order.deliveryDate = new Date(deliveryDate);
+    }
+
+    // Apply other updates like notes, harvestLocation, etc.
+    Object.assign(order, otherUpdates);
+
+    await order.save(); // Triggers pre-save hook for totals
 
     const response: ApiResponse = {
         success: true,
-        data: updatedOrder,
+        data: order,
         message: 'Order updated successfully',
     };
 
@@ -293,11 +329,7 @@ export const deleteOrder = asyncHandler(async (req: Request, res: Response): Pro
         throw new AppError('Order not found', 404);
     }
 
-    // Only allow deleting pending orders
-    if (order.status !== 'pending') {
-        throw new AppError('Can only delete pending orders', 400);
-    }
-
+    // UPDATED: Allow deleting any order to make mistakes reversible
     await Order.findByIdAndDelete(req.params.id);
 
     const response: ApiResponse = {

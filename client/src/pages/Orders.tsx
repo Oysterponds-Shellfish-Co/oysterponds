@@ -9,7 +9,9 @@ import {
   Calendar,
   Package,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Layout } from '@/components/layout/Layout';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchOrders, updateOrderStatus } from '@/store/slices';
+import { fetchOrders, updateOrderStatus, deleteOrder, updateOrder, fetchHarvestLocations } from '@/store/slices';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { IOrder, OrderStatus } from '@/types';
 import { toast } from 'sonner';
@@ -58,14 +60,22 @@ const statusColors: Record<string, string> = {
 export default function Orders() {
   const dispatch = useAppDispatch();
   const { items: orders, loading, error } = useAppSelector((state) => state.orders);
+  const { items: harvestLocations } = useAppSelector((state) => state.harvestLocations);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    harvestLocation: '',
+    deliveryDate: '',
+    notes: ''
+  });
 
   useEffect(() => {
     dispatch(fetchOrders({}));
+    dispatch(fetchHarvestLocations());
   }, [dispatch]);
 
   const filteredOrders = useMemo(() => {
@@ -89,6 +99,46 @@ export default function Orders() {
       }
     } catch {
       toast.error('Failed to update order status');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+    try {
+      await dispatch(deleteOrder(orderId)).unwrap();
+      toast.success('Order deleted successfully');
+      setSelectedOrder(null);
+    } catch (err: any) {
+      toast.error(err || 'Failed to delete order');
+    }
+  };
+
+  const startEditing = (order: IOrder) => {
+    setEditForm({
+      harvestLocation: order.harvestLocation || '',
+      deliveryDate: new Date(order.deliveryDate).toISOString().split('T')[0],
+      notes: order.notes || ''
+    });
+    setIsEditing(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder) return;
+    try {
+      await dispatch(updateOrder({
+        id: selectedOrder._id,
+        order: editForm
+      })).unwrap();
+      toast.success('Order updated successfully');
+      setIsEditing(false);
+      // Local state update for the modal
+      setSelectedOrder(prev => prev ? {
+        ...prev,
+        ...editForm,
+        deliveryDate: new Date(editForm.deliveryDate).toISOString()
+      } : null);
+    } catch (err: any) {
+      toast.error(err || 'Failed to update order');
     }
   };
 
@@ -337,16 +387,36 @@ export default function Orders() {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-md max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="font-mono text-primary">
-                #{selectedOrder?.orderNumber}
-              </span>
-              {selectedOrder && (
-                <Badge variant="outline" className={statusColors[selectedOrder.status]}>
-                  {selectedOrder.status}
-                </Badge>
-              )}
-            </DialogTitle>
+            <div className="flex justify-between items-center pr-8">
+              <DialogTitle className="flex items-center gap-2">
+                <span className="font-mono text-primary">
+                  #{selectedOrder?.orderNumber}
+                </span>
+                {selectedOrder && (
+                  <Badge variant="outline" className={statusColors[selectedOrder.status]}>
+                    {selectedOrder.status}
+                  </Badge>
+                )}
+              </DialogTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                  onClick={() => startEditing(selectedOrder!)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleDeleteOrder(selectedOrder!._id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
 
           {selectedOrder && (
@@ -405,44 +475,126 @@ export default function Orders() {
                 </div>
 
                 {/* Status Update Buttons */}
-                {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm">Update Status</h4>
-                    <div className="flex gap-2 flex-wrap">
-                      {selectedOrder.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                          onClick={() => handleStatusChange(selectedOrder._id, 'confirmed')}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {(selectedOrder.status === 'pending' || selectedOrder.status === 'confirmed') && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleStatusChange(selectedOrder._id, 'delivered')}
-                          >
-                            Mark Delivered
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                            onClick={() => handleStatusChange(selectedOrder._id, 'cancelled')}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Update Status</h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Uncancel logic */}
+                    {selectedOrder.status === 'cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border-yellow-200"
+                        onClick={() => handleStatusChange(selectedOrder._id, 'pending')}
+                      >
+                        Un-cancel
+                      </Button>
+                    )}
+
+                    {/* Pending transitions */}
+                    {selectedOrder.status === 'pending' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                        onClick={() => handleStatusChange(selectedOrder._id, 'confirmed')}
+                      >
+                        Confirm
+                      </Button>
+                    )}
+
+                    {/* Confirm/Deliver logic */}
+                    {(selectedOrder.status === 'pending' || selectedOrder.status === 'confirmed') && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleStatusChange(selectedOrder._id, 'delivered')}
+                      >
+                        Mark Delivered
+                      </Button>
+                    )}
+
+                    {/* Undo logic */}
+                    {selectedOrder.status === 'delivered' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleStatusChange(selectedOrder._id, 'confirmed')}
+                      >
+                        Undo Delivery
+                      </Button>
+                    )}
+
+                    {/* Cancel logic */}
+                    {selectedOrder.status !== 'cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                        onClick={() => handleStatusChange(selectedOrder._id, 'cancelled')}
+                      >
+                        Cancel
+                      </Button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={isEditing} onOpenChange={() => setIsEditing(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Order #{selectedOrder?.orderNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="harvestLocation" className="text-sm font-medium">Harvest Location</label>
+              <Select
+                value={editForm.harvestLocation}
+                onValueChange={(val) => setEditForm(prev => ({ ...prev, harvestLocation: val }))}
+              >
+                <SelectTrigger id="harvestLocation">
+                  <SelectValue placeholder="Select harvest location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {harvestLocations.filter(loc => loc.active).map(location => (
+                    <SelectItem key={location._id} value={location.code}>
+                      {location.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="deliveryDate" className="text-sm font-medium">Delivery Date</label>
+              <Input
+                id="deliveryDate"
+                type="date"
+                value={editForm.deliveryDate}
+                onChange={(e) => setEditForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="notes" className="text-sm font-medium">Notes</label>
+              <textarea
+                id="notes"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={editForm.notes}
+                onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Add special instructions..."
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateOrder}>
+              Save Changes
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Layout>

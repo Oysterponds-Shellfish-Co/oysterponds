@@ -21,6 +21,7 @@ export {
     createOrder,
     createPublicOrder,
     updateOrderStatus,
+    updateOrder,
     deleteOrder,
     clearOrdersError,
     clearSelectedOrder,
