@@ -3,7 +3,10 @@ import { Resend } from 'resend';
 // Company info for emails
 const COMPANY_INFO = {
     name: 'Oysterponds Shellfish Co.',
-    internalEmail: 'phil@oysterpondsshellfish.com',
+    internalEmails: [
+        'phil@oysterpondsshellfish.com',
+        'holly@oysterpondsshellfish.com',
+    ],
 };
 
 // Initialize Resend client
@@ -17,7 +20,7 @@ const getResendClient = (): Resend => {
 
 // The "from" address - must be a verified domain in Resend, or use onboarding address
 const getFromAddress = (): string => {
-    return process.env.RESEND_FROM_EMAIL || 'Oysterponds Shellfish Co. <onboarding@resend.dev>';
+    return process.env.RESEND_FROM_EMAIL || 'Oysterponds Shellfish Co. <phil@oysterpondsshellfish.com>';
 };
 
 // Generate invoice email HTML
@@ -159,10 +162,11 @@ export const sendInvoiceEmail = async (
     try {
         const resend = getResendClient();
 
-        // Always include internal email
-        // TODO: Remove this override after domain verification on Resend
-        console.log('Original recipients (overridden for testing):', recipientEmails);
-        const allRecipients = ['abdullah.ahmad.arslan125@gmail.com'];
+        // Always include internal emails (phil + holly)
+        const allRecipients = Array.from(new Set([
+            ...recipientEmails,
+            ...COMPANY_INFO.internalEmails
+        ])).filter(Boolean);
 
         // Build attachments array
         const attachments: { filename: string; content: Buffer }[] = [
@@ -213,7 +217,7 @@ export const sendInvoiceEmail = async (
     }
 };
 
-// Get internal email address
-export const getInternalEmail = (): string => {
-    return COMPANY_INFO.internalEmail;
+// Get internal email addresses
+export const getInternalEmails = (): string[] => {
+    return COMPANY_INFO.internalEmails;
 };
