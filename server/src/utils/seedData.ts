@@ -43,6 +43,12 @@ const products = [
         basePrice: 0.80,
         unit: 'oyster',
     },
+    {
+        name: 'Adjustment',
+        description: 'Reimbursement or temporary discount adjustment',
+        basePrice: 0,
+        unit: 'piece',
+    },
 ];
 
 // Seed data for harvest locations

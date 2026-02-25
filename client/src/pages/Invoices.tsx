@@ -92,8 +92,17 @@ export default function Invoices() {
 
     // Separate state for temperature (number) and time on truck
     const [temperatureValue, setTemperatureValue] = useState<number | ''>('');
-    const [truckStartTime, setTruckStartTime] = useState('09:00');
-    const [truckEndTime, setTruckEndTime] = useState('10:00');
+    const [truckStartHour, setTruckStartHour] = useState('9');
+    const [truckStartMinute, setTruckStartMinute] = useState('00');
+    const [truckStartPeriod, setTruckStartPeriod] = useState('AM');
+    const [truckEndHour, setTruckEndHour] = useState('10');
+    const [truckEndMinute, setTruckEndMinute] = useState('00');
+    const [truckEndPeriod, setTruckEndPeriod] = useState('AM');
+
+    // Harvest time state
+    const [harvestHour, setHarvestHour] = useState('8');
+    const [harvestMinute, setHarvestMinute] = useState('00');
+    const [harvestPeriod, setHarvestPeriod] = useState('AM');
 
     // Invoice form state
     const [invoiceForm, setInvoiceForm] = useState<CreateInvoiceForm>({
@@ -130,12 +139,9 @@ export default function Invoices() {
         return matchesSearch && matchesStatus;
     });
 
-    // Helper to format time (24h to 12h format)
-    const formatTime12h = (time24: string): string => {
-        const [hours, minutes] = time24.split(':').map(Number);
-        const period = hours >= 12 ? 'pm' : 'am';
-        const hours12 = hours % 12 || 12;
-        return `${hours12}:${minutes.toString().padStart(2, '0')}${period}`;
+    // Helper to format hour/minute/period into readable time string
+    const formatTimeParts = (hour: string, minute: string, period: string): string => {
+        return `${hour}:${minute} ${period}`;
     };
 
     const handleCreateInvoice = async () => {
@@ -154,7 +160,8 @@ export default function Invoices() {
 
         // Format the values
         const formattedTemperature = `${temperatureValue}°F`;
-        const formattedTimeOnTruck = `${formatTime12h(truckStartTime)} - ${formatTime12h(truckEndTime)}`;
+        const formattedHarvestTime = formatTimeParts(harvestHour, harvestMinute, harvestPeriod);
+        const formattedTimeOnTruck = `${formatTimeParts(truckStartHour, truckStartMinute, truckStartPeriod)} - ${formatTimeParts(truckEndHour, truckEndMinute, truckEndPeriod)}`;
 
         setIsSaving(true);
         try {
@@ -163,6 +170,7 @@ export default function Invoices() {
                     ...invoiceForm,
                     orderId: selectedOrder._id,
                     harvestLocation: selectedOrder.harvestLocation,
+                    harvestTime: formattedHarvestTime,
                     departureTemperature: formattedTemperature,
                     timeOnTruck: formattedTimeOnTruck,
                 })
@@ -172,12 +180,19 @@ export default function Invoices() {
             setIsCreateModalOpen(false);
             setSelectedOrder(null);
             setTemperatureValue('');
-            setTruckStartTime('09:00');
-            setTruckEndTime('10:00');
+            setTruckStartHour('9');
+            setTruckStartMinute('00');
+            setTruckStartPeriod('AM');
+            setTruckEndHour('10');
+            setTruckEndMinute('00');
+            setTruckEndPeriod('AM');
+            setHarvestHour('8');
+            setHarvestMinute('00');
+            setHarvestPeriod('AM');
             setInvoiceForm({
                 orderId: '',
                 harvestDate: new Date().toISOString().split('T')[0],
-                harvestTime: '08:00',
+                harvestTime: '8:00 AM',
                 departureTemperature: '',
                 timeOnTruck: '',
                 deliveredBy: '',
@@ -215,12 +230,15 @@ export default function Invoices() {
         setInvoiceForm({
             orderId: order._id,
             harvestDate: new Date().toISOString().split('T')[0],
-            harvestTime: '08:00',
+            harvestTime: '8:00 AM',
             harvestLocation: order.harvestLocation,
             departureTemperature: '',
             timeOnTruck: '',
             deliveredBy: '',
         });
+        setHarvestHour('8');
+        setHarvestMinute('00');
+        setHarvestPeriod('AM');
         setIsCreateModalOpen(true);
     };
 
@@ -510,13 +528,38 @@ export default function Invoices() {
                                 </div>
                                 <div>
                                     <Label>Harvest Time</Label>
-                                    <Input
-                                        type="time"
-                                        value={invoiceForm.harvestTime}
-                                        onChange={(e) =>
-                                            setInvoiceForm((prev) => ({ ...prev, harvestTime: e.target.value }))
-                                        }
-                                    />
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Select value={harvestHour} onValueChange={setHarvestHour}>
+                                            <SelectTrigger className="w-[70px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                                    <SelectItem key={h} value={String(h)}>{h}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <span className="text-lg font-bold">:</span>
+                                        <Select value={harvestMinute} onValueChange={setHarvestMinute}>
+                                            <SelectTrigger className="w-[70px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {['00', '15', '30', '45'].map(m => (
+                                                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={harvestPeriod} onValueChange={setHarvestPeriod}>
+                                            <SelectTrigger className="w-[80px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="AM">AM</SelectItem>
+                                                <SelectItem value="PM">PM</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
 
@@ -547,19 +590,73 @@ export default function Invoices() {
                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                     <div>
                                         <span className="text-xs text-muted-foreground mb-1 block">Start</span>
-                                        <Input
-                                            type="time"
-                                            value={truckStartTime}
-                                            onChange={(e) => setTruckStartTime(e.target.value)}
-                                        />
+                                        <div className="flex items-center gap-1">
+                                            <Select value={truckStartHour} onValueChange={setTruckStartHour}>
+                                                <SelectTrigger className="w-[60px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                                        <SelectItem key={h} value={String(h)}>{h}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <span className="text-sm font-bold">:</span>
+                                            <Select value={truckStartMinute} onValueChange={setTruckStartMinute}>
+                                                <SelectTrigger className="w-[60px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {['00', '15', '30', '45'].map(m => (
+                                                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={truckStartPeriod} onValueChange={setTruckStartPeriod}>
+                                                <SelectTrigger className="w-[65px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="AM">AM</SelectItem>
+                                                    <SelectItem value="PM">PM</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
                                     <div>
                                         <span className="text-xs text-muted-foreground mb-1 block">End</span>
-                                        <Input
-                                            type="time"
-                                            value={truckEndTime}
-                                            onChange={(e) => setTruckEndTime(e.target.value)}
-                                        />
+                                        <div className="flex items-center gap-1">
+                                            <Select value={truckEndHour} onValueChange={setTruckEndHour}>
+                                                <SelectTrigger className="w-[60px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                                        <SelectItem key={h} value={String(h)}>{h}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <span className="text-sm font-bold">:</span>
+                                            <Select value={truckEndMinute} onValueChange={setTruckEndMinute}>
+                                                <SelectTrigger className="w-[60px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {['00', '15', '30', '45'].map(m => (
+                                                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={truckEndPeriod} onValueChange={setTruckEndPeriod}>
+                                                <SelectTrigger className="w-[65px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="AM">AM</SelectItem>
+                                                    <SelectItem value="PM">PM</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -634,13 +731,13 @@ export default function Invoices() {
                                 />
                             </div>
 
-                            {/* Check Number */}
+                            {/* Payment Method & Date */}
                             <div className="space-y-2">
-                                <Label htmlFor="checkNumber">Check Number (Optional)</Label>
+                                <Label htmlFor="checkNumber">Payment Method & Date</Label>
                                 <Input
                                     id="checkNumber"
                                     type="text"
-                                    placeholder="Enter check number"
+                                    placeholder="e.g. ACH 2/25, Check #1234, Cash"
                                     value={checkNumber}
                                     onChange={(e) => setCheckNumber(e.target.value)}
                                 />

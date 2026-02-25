@@ -127,6 +127,13 @@ export default function NewOrder() {
     ));
   };
 
+  const setUnitPrice = (productId: string, value: string) => {
+    const price = parseFloat(value) || 0;
+    setOrderLines(prev => prev.map(line =>
+      line.productId === productId ? { ...line, unitPrice: price } : line
+    ));
+  };
+
   const activeLines = useMemo(() =>
     orderLines.filter(line => line.quantity > 0),
     [orderLines]
@@ -278,6 +285,7 @@ export default function NewOrder() {
                       const hasQuantity = quantity > 0;
                       const basePrice = product?.basePrice ?? 0.80;
                       const hasCustomPrice = price !== basePrice;
+                      const isAdjustment = line.productName === 'Adjustment';
 
                       return (
                         <motion.div
@@ -297,47 +305,84 @@ export default function NewOrder() {
                                 {line.productName}
                               </h3>
                               <p className="text-xs text-muted-foreground">
-                                per {product?.unit || 'oyster'}
+                                {isAdjustment ? 'credit / discount' : `per ${product?.unit || 'oyster'}`}
                               </p>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-primary">
-                                {formatCurrency(price)}
-                              </p>
-                              {selectedCustomer && hasCustomPrice && (
-                                <p className="text-xs text-muted-foreground line-through">
-                                  {formatCurrency(basePrice)}
+                            {!isAdjustment && (
+                              <div className="text-right">
+                                <p className="font-semibold text-primary">
+                                  {formatCurrency(price)}
                                 </p>
-                              )}
-                            </div>
+                                {selectedCustomer && hasCustomPrice && (
+                                  <p className="text-xs text-muted-foreground line-through">
+                                    {formatCurrency(basePrice)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => updateQuantity(line.productId, -10)}
-                              disabled={quantity === 0}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              value={quantity}
-                              onChange={(e) => setQuantity(line.productId, e.target.value)}
-                              className="h-8 w-20 text-center"
-                              min="0"
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => updateQuantity(line.productId, 10)}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                          </div>
+                          {isAdjustment ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant={hasQuantity ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() => {
+                                    if (hasQuantity) {
+                                      setQuantity(line.productId, '0');
+                                      setUnitPrice(line.productId, '0');
+                                    } else {
+                                      setQuantity(line.productId, '1');
+                                    }
+                                  }}
+                                >
+                                  {hasQuantity ? 'Remove Adjustment' : 'Add Adjustment'}
+                                </Button>
+                              </div>
+                              {hasQuantity && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Label className="text-sm whitespace-nowrap">Amount ($):</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={price || ''}
+                                    onChange={(e) => setUnitPrice(line.productId, e.target.value)}
+                                    className="h-8 w-32"
+                                    placeholder="-50.00"
+                                  />
+                                  <p className="text-xs text-muted-foreground">Use negative for credits</p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => updateQuantity(line.productId, -10)}
+                                disabled={quantity === 0}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => setQuantity(line.productId, e.target.value)}
+                                className="h-8 w-20 text-center"
+                                min="0"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => updateQuantity(line.productId, 10)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
 
                           <AnimatePresence>
                             {hasQuantity && (

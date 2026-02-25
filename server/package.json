@@ -8,6 +8,7 @@
         "build": "tsc",
         "start": "node dist/server.js",
         "seed": "tsx src/utils/seedData.ts",
+        "clean-data": "tsx src/utils/cleanTestData.ts",
         "create-admin": "tsx src/utils/createAdmin.ts"
     },
     "dependencies": {

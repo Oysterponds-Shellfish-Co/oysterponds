@@ -23,8 +23,8 @@ const orderValidation = [
         .isInt({ min: 1 })
         .withMessage('Quantity must be at least 1'),
     body('items.*.pricePerUnit')
-        .isFloat({ min: 0 })
-        .withMessage('Price per unit must be positive'),
+        .isFloat()
+        .withMessage('Price per unit is required'),
     body('deliveryDate')
         .isISO8601()
         .withMessage('Valid delivery date is required'),

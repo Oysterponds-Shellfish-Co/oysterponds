@@ -17,8 +17,8 @@ const getNextInvoiceNumber = async (): Promise<string> => {
             const lastNum = parseInt(lastInvoice.invoiceNumber.replace('INV-', ''), 10);
             invoiceCounter = lastNum;
         } else {
-            // Start from 16000 as per client request (first invoice will be 16000)
-            invoiceCounter = 15999;
+            // Start from 16000 as per client request (first invoice will be 16001)
+            invoiceCounter = 16000;
         }
     }
     invoiceCounter++;

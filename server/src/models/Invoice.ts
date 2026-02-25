@@ -84,12 +84,10 @@ const invoiceItemSchema = new Schema<IInvoiceItem>(
         pricePerUnit: {
             type: Number,
             required: true,
-            min: 0,
         },
         lineTotal: {
             type: Number,
             required: true,
-            min: 0,
         },
     },
     { _id: false }
@@ -166,7 +164,6 @@ const invoiceSchema = new Schema<IInvoiceDocument>(
         subtotal: {
             type: Number,
             required: true,
-            min: 0,
         },
         tax: {
             type: Number,
@@ -176,7 +173,6 @@ const invoiceSchema = new Schema<IInvoiceDocument>(
         total: {
             type: Number,
             required: true,
-            min: 0,
         },
         status: {
             type: String,

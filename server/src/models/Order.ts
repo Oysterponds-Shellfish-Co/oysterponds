@@ -48,7 +48,6 @@ const orderItemSchema = new Schema<IOrderItem>(
         pricePerUnit: {
             type: Number,
             required: true,
-            min: [0, 'Price cannot be negative'],
         },
         lineTotal: {
             type: Number,
@@ -91,7 +90,6 @@ const orderSchema = new Schema<IOrderDocument>(
         subtotal: {
             type: Number,
             required: true,
-            min: 0,
         },
         tax: {
             type: Number,
@@ -101,7 +99,6 @@ const orderSchema = new Schema<IOrderDocument>(
         total: {
             type: Number,
             required: true,
-            min: 0,
         },
         status: {
             type: String,
