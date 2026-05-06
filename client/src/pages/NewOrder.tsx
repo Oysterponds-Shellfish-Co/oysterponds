@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Check,
   Calendar,
+  Clock,
   User,
   Package,
   Loader2
@@ -62,10 +63,16 @@ export default function NewOrder() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [selectedHarvestLocation, setSelectedHarvestLocation] = useState<string>('');
+  const [harvestTime, setHarvestTime] = useState('');
   const [orderLines, setOrderLines] = useState<OrderLine[]>([]);
-  const [deliveryDate, setDeliveryDate] = useState(
-    getNextThursday().toISOString().split('T')[0]
-  );
+  // Build default delivery date as local YYYY-MM-DD (avoids UTC day-shift)
+  const [deliveryDate, setDeliveryDate] = useState(() => {
+    const d = getNextThursday();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -159,6 +166,7 @@ export default function NewOrder() {
     const orderData = {
       customer: selectedCustomerId,
       harvestLocation: selectedHarvestLocation,
+      harvestTime,
       items: activeLines.map(line => ({
         product: line.productId,
         quantity: line.quantity,
@@ -443,6 +451,23 @@ export default function NewOrder() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="harvestTime" className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      Harvest Time
+                    </Label>
+                    <Input
+                      id="harvestTime"
+                      type="text"
+                      value={harvestTime}
+                      onChange={(e) => setHarvestTime(e.target.value)}
+                      placeholder="e.g. 6:47 AM or 14:30"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter any time format — this will appear on the invoice
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="notes">Order Notes (optional)</Label>

@@ -87,7 +87,7 @@ export const getOrder = asyncHandler(async (req: Request, res: Response): Promis
 // @route   POST /api/orders
 // @access  Private
 export const createOrder = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { customer: customerId, items, deliveryDate, notes, orderSource = 'internal' } = req.body;
+    const { customer: customerId, items, deliveryDate, notes, harvestTime = '', orderSource = 'internal' } = req.body;
 
     // Validate customer exists
     const customer = await Customer.findById(customerId);
@@ -132,6 +132,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response): Pro
         customer: customerId,
         customerName: customer.businessName,
         harvestLocation: req.body.harvestLocation || '',
+        harvestTime,
         items: processedItems,
         subtotal,
         tax,
@@ -206,6 +207,7 @@ export const createPublicOrder = asyncHandler(async (req: Request, res: Response
         customer: customer._id,
         customerName: customer.businessName,
         harvestLocation: req.body.harvestLocation || '',
+        harvestTime: req.body.harvestTime || '',
         items: processedItems,
         subtotal,
         tax,

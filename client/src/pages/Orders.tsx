@@ -11,7 +11,10 @@ import {
   Loader2,
   RefreshCw,
   Edit,
-  Trash2
+  Trash2,
+  Download,
+  Mail,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,8 +36,9 @@ import {
 import { Layout } from '@/components/layout/Layout';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchOrders, updateOrderStatus, deleteOrder, updateOrder, fetchHarvestLocations } from '@/store/slices';
+import { fetchInvoiceByOrder, getInvoicePDFUrl, sendInvoiceEmail } from '@/store/slices';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { IOrder, OrderStatus } from '@/types';
+import { IOrder, OrderStatus, IInvoice } from '@/types';
 import { toast } from 'sonner';
 
 const containerVariants = {
@@ -72,11 +76,29 @@ export default function Orders() {
     deliveryDate: '',
     notes: ''
   });
+  // Invoice associated with the currently-selected order
+  const [orderInvoice, setOrderInvoice] = useState<IInvoice | null>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   useEffect(() => {
     dispatch(fetchOrders({}));
     dispatch(fetchHarvestLocations());
   }, [dispatch]);
+
+  // When an order is selected, try to fetch its associated invoice
+  useEffect(() => {
+    if (!selectedOrder) {
+      setOrderInvoice(null);
+      return;
+    }
+    setInvoiceLoading(true);
+    dispatch(fetchInvoiceByOrder(selectedOrder._id))
+      .unwrap()
+      .then((inv) => setOrderInvoice(inv))
+      .catch(() => setOrderInvoice(null))
+      .finally(() => setInvoiceLoading(false));
+  }, [selectedOrder?._id, dispatch]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
@@ -114,9 +136,14 @@ export default function Orders() {
   };
 
   const startEditing = (order: IOrder) => {
+    // Parse delivery date as local to avoid UTC day-shift
+    const d = new Date(order.deliveryDate);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
     setEditForm({
       harvestLocation: order.harvestLocation || '',
-      deliveryDate: new Date(order.deliveryDate).toISOString().split('T')[0],
+      deliveryDate: `${yyyy}-${mm}-${dd}`,
       notes: order.notes || ''
     });
     setIsEditing(true);
@@ -144,6 +171,30 @@ export default function Orders() {
 
   const handleRefresh = () => {
     dispatch(fetchOrders({}));
+  };
+
+  const handleDownloadInvoicePDF = (invoiceId: string) => {
+    const url = getInvoicePDFUrl(invoiceId);
+    window.open(url, '_blank');
+  };
+
+  const handleEmailInvoice = async (invoiceId: string) => {
+    setIsSendingEmail(true);
+    try {
+      await dispatch(sendInvoiceEmail(invoiceId)).unwrap();
+      toast.success('Invoice emailed successfully');
+      // Refresh the invoice state
+      if (selectedOrder) {
+        dispatch(fetchInvoiceByOrder(selectedOrder._id))
+          .unwrap()
+          .then((inv) => setOrderInvoice(inv))
+          .catch(() => {});
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to send email. Check SMTP settings.');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   return (
@@ -445,6 +496,13 @@ export default function Orders() {
                 </div>
               )}
 
+              {selectedOrder.harvestTime && (
+                <div>
+                  <h4 className="font-semibold mb-1">Harvest Time</h4>
+                  <p className="text-muted-foreground">{selectedOrder.harvestTime}</p>
+                </div>
+              )}
+
               <div>
                 <h4 className="font-semibold mb-2">Items</h4>
                 <div className="space-y-2">
@@ -472,6 +530,54 @@ export default function Orders() {
                   <span className="text-xl font-bold text-primary">
                     {formatCurrency(selectedOrder.total)}
                   </span>
+                </div>
+
+                {/* Invoice Actions (Print / Email) */}
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Invoice
+                  </h4>
+                  {invoiceLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Checking for invoice...
+                    </div>
+                  ) : orderInvoice ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleDownloadInvoicePDF(orderInvoice._id)}
+                      >
+                        <Download className="w-4 h-4" />
+                        Print PDF
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleEmailInvoice(orderInvoice._id)}
+                        disabled={isSendingEmail}
+                      >
+                        {isSendingEmail ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mail className="w-4 h-4" />
+                        )}
+                        Email Invoice
+                      </Button>
+                      <span className="text-xs text-muted-foreground self-center">
+                        {orderInvoice.invoiceNumber} &bull; {orderInvoice.status}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No invoice yet. Go to the{' '}
+                      <span className="font-medium text-primary">Invoices</span> page to generate one once this order is confirmed.
+                    </p>
+                  )}
                 </div>
 
                 {/* Status Update Buttons */}

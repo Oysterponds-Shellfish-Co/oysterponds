@@ -99,10 +99,8 @@ export default function Invoices() {
     const [truckEndMinute, setTruckEndMinute] = useState('00');
     const [truckEndPeriod, setTruckEndPeriod] = useState('AM');
 
-    // Harvest time state
-    const [harvestHour, setHarvestHour] = useState('8');
-    const [harvestMinute, setHarvestMinute] = useState('00');
-    const [harvestPeriod, setHarvestPeriod] = useState('AM');
+    // Harvest time state — free-text input (e.g. "6:47 AM")
+    const [harvestTimeText, setHarvestTimeText] = useState('');
 
     // Invoice form state
     const [invoiceForm, setInvoiceForm] = useState<CreateInvoiceForm>({
@@ -160,7 +158,6 @@ export default function Invoices() {
 
         // Format the values
         const formattedTemperature = `${temperatureValue}°F`;
-        const formattedHarvestTime = formatTimeParts(harvestHour, harvestMinute, harvestPeriod);
         const formattedTimeOnTruck = `${formatTimeParts(truckStartHour, truckStartMinute, truckStartPeriod)} - ${formatTimeParts(truckEndHour, truckEndMinute, truckEndPeriod)}`;
 
         setIsSaving(true);
@@ -170,7 +167,7 @@ export default function Invoices() {
                     ...invoiceForm,
                     orderId: selectedOrder._id,
                     harvestLocation: selectedOrder.harvestLocation,
-                    harvestTime: formattedHarvestTime,
+                    harvestTime: harvestTimeText,
                     departureTemperature: formattedTemperature,
                     timeOnTruck: formattedTimeOnTruck,
                 })
@@ -186,13 +183,11 @@ export default function Invoices() {
             setTruckEndHour('10');
             setTruckEndMinute('00');
             setTruckEndPeriod('AM');
-            setHarvestHour('8');
-            setHarvestMinute('00');
-            setHarvestPeriod('AM');
+            setHarvestTimeText('');
             setInvoiceForm({
                 orderId: '',
                 harvestDate: new Date().toISOString().split('T')[0],
-                harvestTime: '8:00 AM',
+                harvestTime: '',
                 departureTemperature: '',
                 timeOnTruck: '',
                 deliveredBy: '',
@@ -230,15 +225,14 @@ export default function Invoices() {
         setInvoiceForm({
             orderId: order._id,
             harvestDate: new Date().toISOString().split('T')[0],
-            harvestTime: '8:00 AM',
+            harvestTime: order.harvestTime || '',
             harvestLocation: order.harvestLocation,
             departureTemperature: '',
             timeOnTruck: '',
             deliveredBy: '',
         });
-        setHarvestHour('8');
-        setHarvestMinute('00');
-        setHarvestPeriod('AM');
+        // Pre-fill harvest time text from order if available
+        setHarvestTimeText(order.harvestTime || '');
         setIsCreateModalOpen(true);
     };
 
@@ -377,7 +371,7 @@ export default function Invoices() {
                                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                                 <h3 className="text-lg font-semibold mb-2">No Invoices Yet</h3>
                                 <p className="text-muted-foreground mb-4">
-                                    Mark an order as "delivered" first, then generate the invoice here.
+                                    Confirm an order first, then use the &ldquo;Orders Ready for Invoice&rdquo; panel above to generate an invoice — you can print or email it right away, before or after delivery.
                                 </p>
                             </CardContent>
                         </Card>
@@ -425,44 +419,45 @@ export default function Invoices() {
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center justify-end gap-2">
+                                                        {/* Print PDF — always available */}
                                                         <Button
-                                                            variant="ghost"
-                                                            size="icon"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-1.5"
                                                             onClick={() => handleDownloadPDF(invoice._id)}
-                                                            title="Download PDF"
+                                                            title="Download / Print PDF"
                                                         >
                                                             <Download className="w-4 h-4" />
+                                                            Print
                                                         </Button>
-                                                        {invoice.status === 'draft' && (
+                                                        {/* Email — available for draft and re-sendable for sent */}
+                                                        {(invoice.status === 'draft' || invoice.status === 'sent') && (
                                                             <Button
-                                                                variant="ghost"
-                                                                size="icon"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="gap-1.5"
                                                                 onClick={() => handleSendEmail(invoice._id)}
                                                                 disabled={isSendingEmail === invoice._id}
-                                                                title="Send Email"
+                                                                title={invoice.status === 'sent' ? 'Re-send email' : 'Send email'}
                                                             >
                                                                 {isSendingEmail === invoice._id ? (
                                                                     <Loader2 className="w-4 h-4 animate-spin" />
                                                                 ) : (
                                                                     <Mail className="w-4 h-4" />
                                                                 )}
+                                                                {invoice.status === 'sent' ? 'Re-send' : 'Email'}
                                                             </Button>
                                                         )}
                                                         {invoice.status === 'sent' && invoice.emailSentAt && (
-                                                            <>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() => openMarkPaidModal(invoice)}
-                                                                    title="Mark as Paid"
-                                                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                                >
-                                                                    <DollarSign className="w-4 h-4" />
-                                                                </Button>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    Sent {formatDate(invoice.emailSentAt)}
-                                                                </span>
-                                                            </>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => openMarkPaidModal(invoice)}
+                                                                title="Mark as Paid"
+                                                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                            >
+                                                                <DollarSign className="w-4 h-4" />
+                                                            </Button>
                                                         )}
                                                         {invoice.status === 'paid' && (
                                                             <span className="text-xs text-green-600 font-medium">
@@ -528,38 +523,16 @@ export default function Invoices() {
                                 </div>
                                 <div>
                                     <Label>Harvest Time</Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Select value={harvestHour} onValueChange={setHarvestHour}>
-                                            <SelectTrigger className="w-[70px]">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                                                    <SelectItem key={h} value={String(h)}>{h}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <span className="text-lg font-bold">:</span>
-                                        <Select value={harvestMinute} onValueChange={setHarvestMinute}>
-                                            <SelectTrigger className="w-[70px]">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {['00', '15', '30', '45'].map(m => (
-                                                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <Select value={harvestPeriod} onValueChange={setHarvestPeriod}>
-                                            <SelectTrigger className="w-[80px]">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="AM">AM</SelectItem>
-                                                <SelectItem value="PM">PM</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <Input
+                                        type="text"
+                                        className="mt-1"
+                                        value={harvestTimeText}
+                                        onChange={(e) => setHarvestTimeText(e.target.value)}
+                                        placeholder="e.g. 6:47 AM or 14:30"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Type any time — pre-filled from order if set
+                                    </p>
                                 </div>
                             </div>
 

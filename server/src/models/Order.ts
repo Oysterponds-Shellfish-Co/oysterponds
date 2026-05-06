@@ -17,6 +17,7 @@ export interface IOrderDocument extends Document {
     customer: Types.ObjectId;
     customerName: string;
     harvestLocation: string;
+    harvestTime: string;  // optional free-text harvest time captured at order creation
     items: IOrderItem[];
     subtotal: number;
     tax: number;
@@ -74,6 +75,10 @@ const orderSchema = new Schema<IOrderDocument>(
             required: true,
         },
         harvestLocation: {
+            type: String,
+            default: '',
+        },
+        harvestTime: {
             type: String,
             default: '',
         },

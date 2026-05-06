@@ -6,9 +6,20 @@ export const formatCurrency = (amount: number): string => {
     }).format(amount);
 };
 
+// Parse a date string safely without UTC shift.
+// "2026-04-30" from Mongo arrives as ISO (T00:00:00Z), which becomes Apr 29
+// in US timezones. We extract the date components directly instead.
+const parseDateLocal = (dateString: string): Date => {
+    // Handle both ISO timestamps and plain YYYY-MM-DD strings
+    const iso = dateString.substring(0, 10); // "YYYY-MM-DD"
+    const [year, month, day] = iso.split('-').map(Number);
+    // Use local noon to avoid any DST edge-cases
+    return new Date(year, month - 1, day, 12, 0, 0);
+};
+
 // Date formatting
 export const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return parseDateLocal(dateString).toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -18,7 +29,7 @@ export const formatDate = (dateString: string): string => {
 
 // Short date format
 export const formatShortDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return parseDateLocal(dateString).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric'
     });

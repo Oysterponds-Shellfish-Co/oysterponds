@@ -73,6 +73,7 @@ export interface IOrder {
     customer: string | ICustomer;
     customerName: string;
     harvestLocation?: string;
+    harvestTime?: string;
     items: IOrderItem[];
     subtotal: number;
     tax: number;
@@ -132,6 +133,7 @@ export interface IOrderStats {
 export interface CreateOrderForm {
     customer: string;
     harvestLocation?: string;
+    harvestTime?: string;
     items: {
         product: string;
         quantity: number;
