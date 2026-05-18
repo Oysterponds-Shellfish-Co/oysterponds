@@ -6,7 +6,8 @@ import {
     getProductAnalytics,
     getARAgingReport,
     exportInvoicesToExcel,
-    getDashboardOverview
+    getDashboardOverview,
+    getDeliveryBreakdown
 } from '../controllers/reportController.js';
 
 const router = express.Router();
@@ -28,6 +29,9 @@ router.get('/product-analytics', getProductAnalytics);
 
 // A/R aging report
 router.get('/ar-aging', getARAgingReport);
+
+// Delivery breakdown by week or month
+router.get('/delivery-breakdown', getDeliveryBreakdown);
 
 // Excel exports
 router.get('/export/invoices', exportInvoicesToExcel);

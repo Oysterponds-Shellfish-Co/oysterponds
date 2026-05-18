@@ -98,6 +98,16 @@ interface ARAgingReport {
     totalInvoices: number;
 }
 
+interface DeliveryRow {
+    date: string;
+    invoiceNumber: string;
+    customerName: string;
+    products: string;
+    totalQuantity: number;
+    total: number;
+    status: string;
+}
+
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -129,18 +139,51 @@ export default function Reports() {
     const [arAging, setArAging] = useState<ARAgingReport | null>(null);
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedWeek, setSelectedWeek] = useState<string>('');
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<DeliveryRow[]>([]);
+    const [deliveryLoading, setDeliveryLoading] = useState(false);
 
-    // Start from 2026 (founding year) and include all years up to current year
-    // This will automatically include 2027, 2028, etc. as time goes on
     const FOUNDING_YEAR = 2026;
     const years = Array.from(
         { length: currentYear - FOUNDING_YEAR + 1 },
         (_, i) => currentYear - i
     );
 
+    const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+        value: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
+        label: new Date(selectedYear, i, 1).toLocaleString('default', { month: 'long' }),
+    }));
+
+    const weekOptions = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date();
+        const dayOfWeek = d.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        d.setDate(d.getDate() + daysToMonday - i * 7);
+        d.setHours(0, 0, 0, 0);
+        const monday = d.toISOString().split('T')[0];
+        const sun = new Date(d);
+        sun.setDate(d.getDate() + 6);
+        const label = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${sun.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        return { value: monday, label };
+    });
+
     useEffect(() => {
         fetchAllReports();
     }, [selectedYear]);
+
+    useEffect(() => {
+        if (!selectedWeek && !selectedMonth) {
+            setDeliveryBreakdown([]);
+            return;
+        }
+        const param = selectedWeek ? `weekOf=${selectedWeek}` : `monthOf=${selectedMonth}`;
+        setDeliveryLoading(true);
+        api.get(`/reports/delivery-breakdown?${param}`)
+            .then(r => setDeliveryBreakdown(r.data.data.rows))
+            .catch(() => toast.error('Failed to load delivery breakdown'))
+            .finally(() => setDeliveryLoading(false));
+    }, [selectedWeek, selectedMonth]);
 
     const fetchAllReports = async () => {
         setLoading(true);
@@ -220,24 +263,54 @@ export default function Reports() {
                     <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
                     <p className="text-muted-foreground">Track sales, invoices, and customer data</p>
                 </div>
-                <div className="flex gap-3">
-                    <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                        <SelectTrigger className="w-[120px]">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {years.map((year) => (
-                                <SelectItem key={year} value={year.toString()}>
-                                    {year}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handleExportExcel} disabled={exporting} className="gap-2">
-                        <FileSpreadsheet className="w-4 h-4" />
-                        {exporting ? 'Exporting...' : 'Export Excel'}
-                    </Button>
+                <div className="flex flex-col gap-2 items-end">
+                    <div className="flex gap-3">
+                        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                            <SelectTrigger className="w-[120px]">
+                                <Calendar className="w-4 h-4 mr-2" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {years.map((year) => (
+                                    <SelectItem key={year} value={year.toString()}>
+                                        {year}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={handleExportExcel} disabled={exporting} className="gap-2">
+                            <FileSpreadsheet className="w-4 h-4" />
+                            {exporting ? 'Exporting...' : 'Export Excel'}
+                        </Button>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                        <span className="text-xs text-muted-foreground">Delivery view:</span>
+                        <Select value={selectedMonth} onValueChange={(v) => { setSelectedMonth(v); setSelectedWeek(''); }}>
+                            <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="By Month" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {monthOptions.map(m => (
+                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedWeek} onValueChange={(v) => { setSelectedWeek(v); setSelectedMonth(''); }}>
+                            <SelectTrigger className="w-[210px]">
+                                <SelectValue placeholder="By Week" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {weekOptions.map(w => (
+                                    <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {(selectedMonth || selectedWeek) && (
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedMonth(''); setSelectedWeek(''); }}>
+                                Clear
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </motion.div>
 
@@ -309,12 +382,13 @@ export default function Reports() {
             </motion.div>
 
             {/* Tabs for detailed reports */}
-            <Tabs defaultValue="invoices" className="space-y-4">
-                <TabsList className="grid grid-cols-4 w-full max-w-[600px]">
+            <Tabs defaultValue={selectedMonth || selectedWeek ? 'deliveries' : 'invoices'} className="space-y-4">
+                <TabsList className="grid grid-cols-5 w-full max-w-[750px]">
                     <TabsTrigger value="invoices">Invoices</TabsTrigger>
                     <TabsTrigger value="customers">Customers</TabsTrigger>
                     <TabsTrigger value="products">Products</TabsTrigger>
                     <TabsTrigger value="aging">A/R Aging</TabsTrigger>
+                    <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
                 </TabsList>
 
                 {/* Invoice Summary Tab */}
@@ -545,6 +619,87 @@ export default function Reports() {
                                 </table>
                             </div>
                         </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Deliveries Tab */}
+                <TabsContent value="deliveries" className="space-y-4">
+                    <Card className="border-border/50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Package className="w-5 h-5" />
+                                {selectedWeek
+                                    ? `Deliveries — Week of ${new Date(selectedWeek).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                                    : selectedMonth
+                                        ? `Deliveries — ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                                        : 'Deliveries'}
+                            </CardTitle>
+                            {!selectedMonth && !selectedWeek && (
+                                <p className="text-sm text-muted-foreground">Select a month or week above to see delivery details.</p>
+                            )}
+                        </CardHeader>
+                        {(selectedMonth || selectedWeek) && (
+                            <CardContent>
+                                {deliveryLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                    </div>
+                                ) : deliveryBreakdown.length === 0 ? (
+                                    <p className="text-center text-muted-foreground py-8">No deliveries found for this period.</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left py-3 px-4">Date</th>
+                                                    <th className="text-left py-3 px-4">Invoice #</th>
+                                                    <th className="text-left py-3 px-4">Customer</th>
+                                                    <th className="text-left py-3 px-4">Products</th>
+                                                    <th className="text-right py-3 px-4">Qty</th>
+                                                    <th className="text-right py-3 px-4">Total</th>
+                                                    <th className="text-center py-3 px-4">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {deliveryBreakdown.map((row, idx) => (
+                                                    <tr key={idx} className="border-b hover:bg-muted/50">
+                                                        <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap">
+                                                            {new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        </td>
+                                                        <td className="py-3 px-4 font-mono text-sm text-primary">{row.invoiceNumber}</td>
+                                                        <td className="py-3 px-4 font-medium">{row.customerName}</td>
+                                                        <td className="py-3 px-4 text-sm text-muted-foreground">{row.products}</td>
+                                                        <td className="py-3 px-4 text-right">{row.totalQuantity}</td>
+                                                        <td className="py-3 px-4 text-right font-semibold">{formatCurrency(row.total)}</td>
+                                                        <td className="py-3 px-4 text-center">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                row.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                                                row.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                                {row.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr className="border-t bg-muted/30 font-semibold">
+                                                    <td colSpan={4} className="py-3 px-4">Total</td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        {deliveryBreakdown.reduce((s, r) => s + r.totalQuantity, 0)}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        {formatCurrency(deliveryBreakdown.reduce((s, r) => s + r.total, 0))}
+                                                    </td>
+                                                    <td />
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        )}
                     </Card>
                 </TabsContent>
             </Tabs>

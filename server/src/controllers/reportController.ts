@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Invoice, Order, Customer } from '../models/index.js';
-import { asyncHandler } from '../middleware/index.js';
+import { asyncHandler, AppError } from '../middleware/index.js';
 import { ApiResponse } from '../types/index.js';
 import ExcelJS from 'exceljs';
 
@@ -490,6 +490,52 @@ export const getDashboardOverview = asyncHandler(async (_req: Request, res: Resp
                 paid: invoices.filter(inv => inv.status === 'paid').length
             }
         }
+    };
+
+    res.status(200).json(response);
+});
+
+// @desc    Get per-delivery breakdown for a specific week or month
+// @route   GET /api/reports/delivery-breakdown?weekOf=YYYY-MM-DD  OR  ?monthOf=YYYY-MM
+// @access  Private
+export const getDeliveryBreakdown = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { weekOf, monthOf } = req.query as { weekOf?: string; monthOf?: string };
+
+    let start: Date, end: Date;
+
+    if (weekOf) {
+        start = new Date(weekOf);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(start);
+        end.setDate(start.getDate() + 7);
+    } else if (monthOf) {
+        const [year, month] = monthOf.split('-').map(Number);
+        start = new Date(year, month - 1, 1);
+        end = new Date(year, month, 1);
+    } else {
+        throw new AppError('Provide weekOf (YYYY-MM-DD) or monthOf (YYYY-MM)', 400);
+    }
+
+    const invoices = await Invoice.find({
+        $or: [
+            { shippingDate: { $gte: start, $lt: end } },
+            { shippingDate: { $exists: false }, createdAt: { $gte: start, $lt: end } },
+        ],
+    }).sort({ customerName: 1, shippingDate: 1, createdAt: 1 });
+
+    const rows = invoices.map(inv => ({
+        date: inv.shippingDate || inv.createdAt,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: inv.customerName,
+        products: inv.items.map(i => `${i.productName} ×${i.quantity}`).join(', '),
+        totalQuantity: inv.items.reduce((s, i) => s + i.quantity, 0),
+        total: inv.total,
+        status: inv.status,
+    }));
+
+    const response: ApiResponse = {
+        success: true,
+        data: { rows, periodStart: start, periodEnd: end },
     };
 
     res.status(200).json(response);

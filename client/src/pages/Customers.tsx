@@ -187,8 +187,10 @@ export default function Customers() {
       await dispatch(updateCustomer({ id: selectedCustomer._id, data: formData })).unwrap();
       setIsEditModalOpen(false);
       toast.success('Customer updated successfully!');
-    } catch (err) {
-      toast.error('Failed to update customer');
+    } catch (err: unknown) {
+      const error = err as string | { message?: string };
+      const message = typeof error === 'string' ? error : error?.message || 'Failed to update customer';
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }

@@ -93,8 +93,12 @@ export const updateCustomer = createAsyncThunk(
             const response = await api.put<ApiResponse<ICustomer>>(`/customers/${id}`, data);
             return response.data.data;
         } catch (error: unknown) {
-            const err = error as { response?: { data?: { error?: string } }; message?: string };
-            return rejectWithValue(err.response?.data?.error || 'Failed to update customer');
+            const err = error as { response?: { data?: { error?: string; errors?: { message: string }[] } }; message?: string };
+            const data = err.response?.data;
+            const message = data?.errors?.length
+                ? data.errors.map((e) => e.message).join(', ')
+                : data?.error || err.message || 'Failed to update customer';
+            return rejectWithValue(message);
         }
     }
 );
