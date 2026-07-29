@@ -416,8 +416,6 @@ export const generateInvoicePDF = async (invoiceData: InvoiceData): Promise<Buff
             '--disable-setuid-sandbox',
             '--disable-gpu',
             '--disable-dev-shm-usage',
-            '--disable-software-rasterizer',
-            '--single-process',
             '--no-zygote',
             '--disable-extensions',
             '--disable-background-networking',
@@ -425,6 +423,7 @@ export const generateInvoicePDF = async (invoiceData: InvoiceData): Promise<Buff
             '--disable-sync',
             '--disable-translate',
             '--no-first-run',
+            '--disable-features=AudioServiceOutOfProcess',
         ],
         ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -612,8 +611,6 @@ export const generateShippingTagPDF = async (tagData: ShippingTagData): Promise<
             '--disable-setuid-sandbox',
             '--disable-gpu',
             '--disable-dev-shm-usage',
-            '--disable-software-rasterizer',
-            '--single-process',
             '--no-zygote',
             '--disable-extensions',
             '--disable-background-networking',
@@ -621,6 +618,7 @@ export const generateShippingTagPDF = async (tagData: ShippingTagData): Promise<
             '--disable-sync',
             '--disable-translate',
             '--no-first-run',
+            '--disable-features=AudioServiceOutOfProcess',
         ],
         ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
