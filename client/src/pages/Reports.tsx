@@ -15,10 +15,18 @@ import {
     CheckCircle,
     Send,
     FileSpreadsheet,
-    ArrowLeft
+    ArrowLeft,
+    ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -29,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import api from '@/services/api';
+import { getInvoicePDFUrl } from '@/store/slices/invoicesSlice';
 
 interface SalesSummary {
     year: number;
@@ -143,6 +152,9 @@ export default function Reports() {
     const [selectedWeek, setSelectedWeek] = useState<string>('');
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<DeliveryRow[]>([]);
     const [deliveryLoading, setDeliveryLoading] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null);
+    const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
+    const [customerInvoicesLoading, setCustomerInvoicesLoading] = useState(false);
 
     const FOUNDING_YEAR = 2026;
     const years = Array.from(
@@ -206,6 +218,19 @@ export default function Reports() {
             toast.error('Failed to load reports');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCustomerClick = async (customerId: string, customerName: string) => {
+        setSelectedCustomer({ id: customerId, name: customerName });
+        setCustomerInvoicesLoading(true);
+        try {
+            const res = await api.get(`/invoices?customer=${customerId}&limit=200`);
+            setCustomerInvoices(res.data.data.invoices || []);
+        } catch {
+            toast.error('Failed to load customer invoices');
+        } finally {
+            setCustomerInvoicesLoading(false);
         }
     };
 
@@ -491,7 +516,12 @@ export default function Reports() {
                                                         <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">
                                                             {index + 1}
                                                         </span>
-                                                        {customer.name}
+                                                        <button
+                                                            onClick={() => handleCustomerClick(customer.customerId, customer.name)}
+                                                            className="text-primary hover:underline font-medium text-left"
+                                                        >
+                                                            {customer.name}
+                                                        </button>
                                                     </span>
                                                 </td>
                                                 <td className="text-right py-3 px-4">{customer.count}</td>
@@ -703,6 +733,73 @@ export default function Reports() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Customer Invoice Drill-Down Modal */}
+            <Dialog open={!!selectedCustomer} onOpenChange={(open) => { if (!open) { setSelectedCustomer(null); setCustomerInvoices([]); } }}>
+                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Invoices — {selectedCustomer?.name}</DialogTitle>
+                    </DialogHeader>
+                    {customerInvoicesLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                    ) : customerInvoices.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">No invoices found for this customer.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b">
+                                        <th className="text-left py-3 px-4 text-sm font-medium">Invoice #</th>
+                                        <th className="text-left py-3 px-4 text-sm font-medium">Shipping Date</th>
+                                        <th className="text-center py-3 px-4 text-sm font-medium">Status</th>
+                                        <th className="text-right py-3 px-4 text-sm font-medium">Total</th>
+                                        <th className="text-center py-3 px-4 text-sm font-medium">PDF</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customerInvoices.map((inv) => (
+                                        <tr key={inv._id} className="border-b hover:bg-muted/50">
+                                            <td className="py-3 px-4 font-mono text-sm font-semibold">{inv.invoiceNumber}</td>
+                                            <td className="py-3 px-4 text-sm text-muted-foreground">
+                                                {new Date(inv.shippingDate || inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <Badge variant="outline" className={
+                                                    inv.status === 'paid' ? 'bg-green-100 text-green-800 border-green-200' :
+                                                    inv.status === 'sent' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                                    'bg-gray-100 text-gray-800 border-gray-200'
+                                                }>
+                                                    {inv.status}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-3 px-4 text-right font-semibold">{formatCurrency(inv.total)}</td>
+                                            <td className="py-3 px-4 text-center">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    title="Download PDF"
+                                                    onClick={() => window.open(getInvoicePDFUrl(inv._id), '_blank')}
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t bg-muted/30 font-semibold">
+                                        <td colSpan={3} className="py-3 px-4 text-sm">{customerInvoices.length} invoices total</td>
+                                        <td className="py-3 px-4 text-right text-sm">{formatCurrency(customerInvoices.reduce((s, inv) => s + inv.total, 0))}</td>
+                                        <td />
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 }
