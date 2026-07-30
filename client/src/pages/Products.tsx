@@ -202,30 +202,31 @@ export default function Products() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    title="Edit"
                                                                     onClick={() => openEdit(product)}
+                                                                    className="gap-1.5"
                                                                 >
                                                                     <Pencil className="w-4 h-4" />
+                                                                    Edit
                                                                 </Button>
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    title="Archive"
-                                                                    className="text-muted-foreground hover:text-red-500"
+                                                                    className="gap-1.5 text-muted-foreground hover:text-red-500"
                                                                     onClick={() => handleArchive(product)}
                                                                 >
                                                                     <Archive className="w-4 h-4" />
+                                                                    Archive
                                                                 </Button>
                                                             </>
                                                         ) : (
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                title="Restore"
-                                                                className="text-muted-foreground hover:text-green-600"
+                                                                className="gap-1.5 text-muted-foreground hover:text-green-600"
                                                                 onClick={() => handleRestore(product)}
                                                             >
                                                                 <RotateCcw className="w-4 h-4" />
+                                                                Restore
                                                             </Button>
                                                         )}
                                                     </div>
