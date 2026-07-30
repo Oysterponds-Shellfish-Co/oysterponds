@@ -6,8 +6,9 @@ import { ApiResponse } from '../types/index.js';
 // @desc    Get all products
 // @route   GET /api/products
 // @access  Public
-export const getProducts = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const products = await Product.find({ active: true }).sort({ name: 1 });
+export const getProducts = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const filter = req.query.all === 'true' ? {} : { active: true };
+    const products = await Product.find(filter).sort({ name: 1 });
 
     const response: ApiResponse = {
         success: true,

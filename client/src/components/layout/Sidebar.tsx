@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileText,
   Users,
+  Package,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { to: '/orders', icon: ClipboardList, label: 'Orders' },
   { to: '/invoices', icon: FileText, label: 'Invoices' },
   { to: '/customers', icon: Users, label: 'Customers' },
+  { to: '/products', icon: Package, label: 'Products' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
 ];
 

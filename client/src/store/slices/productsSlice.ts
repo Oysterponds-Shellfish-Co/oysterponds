@@ -17,9 +17,10 @@ const initialState: ProductsState = {
 // Async thunks
 export const fetchProducts = createAsyncThunk(
     'products/fetchProducts',
-    async (_, { rejectWithValue }) => {
+    async (params: { all?: boolean } | void, { rejectWithValue }) => {
         try {
-            const response = await api.get<ApiResponse<IProduct[]>>('/products');
+            const url = params && params.all ? '/products?all=true' : '/products';
+            const response = await api.get<ApiResponse<IProduct[]>>(url);
             return response.data.data || [];
         } catch (error: unknown) {
             const err = error as { response?: { data?: { error?: string } }; message?: string };
@@ -50,6 +51,19 @@ export const updateProduct = createAsyncThunk(
         } catch (error: unknown) {
             const err = error as { response?: { data?: { error?: string } }; message?: string };
             return rejectWithValue(err.response?.data?.error || 'Failed to update product');
+        }
+    }
+);
+
+export const deleteProduct = createAsyncThunk(
+    'products/deleteProduct',
+    async (id: string, { rejectWithValue }) => {
+        try {
+            await api.delete(`/products/${id}`);
+            return id;
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { error?: string } }; message?: string };
+            return rejectWithValue(err.response?.data?.error || 'Failed to archive product');
         }
     }
 );
@@ -99,6 +113,13 @@ const productsSlice = createSlice({
                     if (index !== -1) {
                         state.items[index] = action.payload;
                     }
+                }
+            })
+            // Delete (archive) product — server does soft-delete, sets active: false
+            .addCase(deleteProduct.fulfilled, (state, action: PayloadAction<string>) => {
+                const index = state.items.findIndex((p) => p._id === action.payload);
+                if (index !== -1) {
+                    state.items[index] = { ...state.items[index], active: false };
                 }
             });
     },

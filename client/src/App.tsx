@@ -10,6 +10,7 @@ import Orders from "./pages/Orders";
 import Invoices from "./pages/Invoices";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
+import Products from "./pages/Products";
 import CustomerOrderPortal from "./pages/CustomerOrderPortal";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
