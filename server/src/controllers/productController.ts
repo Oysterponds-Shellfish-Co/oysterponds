@@ -65,7 +65,7 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response): P
     const product = await Product.findByIdAndUpdate(
         req.params.id,
         req.body,
-        { new: true, runValidators: true }
+        { new: true, runValidators: false }
     );
 
     if (!product) {
