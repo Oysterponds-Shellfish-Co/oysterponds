@@ -73,11 +73,12 @@ const statusIcons: Record<string, React.ReactNode> = {
 
 export default function Invoices() {
     const dispatch = useAppDispatch();
-    const { invoices, loading, companyInfo } = useAppSelector((state) => state.invoices);
+    const { invoices, loading, companyInfo, pagination } = useAppSelector((state) => state.invoices);
     const { items: orders } = useAppSelector((state) => state.orders);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [currentPage, setCurrentPage] = useState(1);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -113,10 +114,16 @@ export default function Invoices() {
     });
 
     useEffect(() => {
-        dispatch(fetchInvoices(undefined));
         dispatch(fetchCompanyInfo());
         dispatch(fetchOrders({}));
     }, [dispatch]);
+
+    useEffect(() => {
+        dispatch(fetchInvoices({
+            page: currentPage,
+            status: statusFilter !== 'all' ? statusFilter : undefined,
+        }));
+    }, [dispatch, currentPage, statusFilter]);
 
     // Filter to get CONFIRMED orders without invoices
     // (Invoices can be generated before delivery - client requirement)
@@ -130,11 +137,10 @@ export default function Invoices() {
     );
 
     const filteredInvoices = invoices.filter((invoice) => {
-        const matchesSearch =
+        return (
             invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-        return matchesSearch && matchesStatus;
+            invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
     });
 
     // Helper to format hour/minute/period into readable time string
@@ -217,7 +223,10 @@ export default function Invoices() {
     };
 
     const handleRefresh = () => {
-        dispatch(fetchInvoices(undefined));
+        dispatch(fetchInvoices({
+            page: currentPage,
+            status: statusFilter !== 'all' ? statusFilter : undefined,
+        }));
     };
 
     const openCreateModal = (order: IOrder) => {
@@ -340,7 +349,7 @@ export default function Invoices() {
                                         className="pl-10"
                                     />
                                 </div>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
                                     <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue placeholder="Filter by status" />
                                     </SelectTrigger>
@@ -472,9 +481,39 @@ export default function Invoices() {
                                 </table>
                             </div>
 
-                            {filteredInvoices.length === 0 && (
+                            {filteredInvoices.length === 0 && !loading && (
                                 <div className="p-8 text-center text-muted-foreground">
                                     No invoices found matching your criteria.
+                                </div>
+                            )}
+
+                            {/* Pagination */}
+                            {pagination.pages > 1 && (
+                                <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+                                    <p className="text-sm text-muted-foreground">
+                                        Showing {((currentPage - 1) * pagination.limit) + 1}–{Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} invoices
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage((p) => p - 1)}
+                                            disabled={currentPage === 1 || loading}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Page {currentPage} of {pagination.pages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage((p) => p + 1)}
+                                            disabled={currentPage >= pagination.pages || loading}
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </Card>
