@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -9,7 +9,12 @@ import {
   ShoppingCart,
   ArrowRight,
   Clock,
-  Loader2
+  Loader2,
+  FileText,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  Package
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +24,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchOrders, fetchOrderStats } from '@/store/slices';
 import { fetchCustomers } from '@/store/slices';
 import { formatCurrency, formatDate, getNextThursday, daysUntil } from '@/utils/helpers';
+import api from '@/services/api';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -47,10 +53,29 @@ export default function Dashboard() {
   const { items: orders, stats, loading: ordersLoading, statsLoading } = useAppSelector((state) => state.orders);
   const { items: customers, loading: customersLoading } = useAppSelector((state) => state.customers);
 
+  const [invoiceSummary, setInvoiceSummary] = useState<{
+    draft: { count: number; total: number };
+    sent: { count: number; total: number };
+    paid: { count: number; total: number };
+    arTotal: number;
+  } | null>(null);
+  const [invoiceSummaryLoading, setInvoiceSummaryLoading] = useState(true);
+
+  const [topProducts, setTopProducts] = useState<{ name: string; quantity: number; revenue: number }[]>([]);
+  const [topProductsLoading, setTopProductsLoading] = useState(true);
+
   useEffect(() => {
     dispatch(fetchOrders({ limit: 10 }));
     dispatch(fetchOrderStats());
     dispatch(fetchCustomers());
+
+    api.get('/reports/invoice-summary').then((res) => {
+      setInvoiceSummary(res.data.data);
+    }).catch(() => {}).finally(() => setInvoiceSummaryLoading(false));
+
+    api.get('/reports/product-analytics').then((res) => {
+      setTopProducts((res.data.data.products || []).slice(0, 5));
+    }).catch(() => {}).finally(() => setTopProductsLoading(false));
   }, [dispatch]);
 
   const nextThursday = getNextThursday();
@@ -180,6 +205,124 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Invoice Snapshot + Top Products */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Invoice Status Snapshot */}
+          <motion.div variants={itemVariants}>
+            <Card className="border-border/50 h-full">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Invoice Snapshot</CardTitle>
+                <Button asChild variant="ghost" size="sm" className="gap-1">
+                  <Link to="/invoices">
+                    View All
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {invoiceSummaryLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : !invoiceSummary ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Could not load data</p>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Draft */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Draft</span>
+                        <Badge variant="outline" className="text-xs">{invoiceSummary.draft.count}</Badge>
+                      </div>
+                      <span className="text-sm font-semibold">{formatCurrency(invoiceSummary.draft.total)}</span>
+                    </div>
+                    {/* Sent / Outstanding */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-100">
+                      <div className="flex items-center gap-2">
+                        <Send className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm font-medium text-yellow-800">Sent (Unpaid)</span>
+                        <Badge variant="outline" className="text-xs border-yellow-300 text-yellow-700">{invoiceSummary.sent.count}</Badge>
+                      </div>
+                      <span className="text-sm font-semibold text-yellow-800">{formatCurrency(invoiceSummary.sent.total)}</span>
+                    </div>
+                    {/* Paid */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-100">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">Paid</span>
+                        <Badge variant="outline" className="text-xs border-green-300 text-green-700">{invoiceSummary.paid.count}</Badge>
+                      </div>
+                      <span className="text-sm font-semibold text-green-800">{formatCurrency(invoiceSummary.paid.total)}</span>
+                    </div>
+                    {/* A/R Total highlight */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 mt-1">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">Total A/R Outstanding</span>
+                      </div>
+                      <span className="text-base font-bold text-primary">{formatCurrency(invoiceSummary.arTotal)}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Top Products */}
+          <motion.div variants={itemVariants}>
+            <Card className="border-border/50 h-full">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Top Products</CardTitle>
+                <span className="text-xs text-muted-foreground">This year</span>
+              </CardHeader>
+              <CardContent>
+                {topProductsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : topProducts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No product data yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {topProducts.map((product, idx) => {
+                      const maxQty = topProducts[0]?.quantity || 1;
+                      const pct = Math.round((product.quantity / maxQty) * 100);
+                      return (
+                        <div key={product.name} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              <span className="font-medium truncate max-w-[140px]">{product.name}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-semibold">{product.quantity.toLocaleString()}</span>
+                              <span className="text-muted-foreground text-xs ml-1">units</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-muted rounded-full h-1.5">
+                              <div
+                                className="bg-primary rounded-full h-1.5 transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
+                              {formatCurrency(product.revenue)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
 
         {/* Recent Orders & Thursday Countdown */}
         <div className="grid md:grid-cols-3 gap-6">
