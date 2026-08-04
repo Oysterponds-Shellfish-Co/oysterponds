@@ -35,6 +35,7 @@ import { Layout } from '@/components/layout/Layout';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
     fetchInvoices,
+    fetchInvoicedOrderIds,
     fetchCompanyInfo,
     createInvoice,
     sendInvoiceEmail,
@@ -73,7 +74,7 @@ const statusIcons: Record<string, React.ReactNode> = {
 
 export default function Invoices() {
     const dispatch = useAppDispatch();
-    const { invoices, loading, companyInfo, pagination } = useAppSelector((state) => state.invoices);
+    const { invoices, loading, companyInfo, pagination, invoicedOrderIds } = useAppSelector((state) => state.invoices);
     const { items: orders } = useAppSelector((state) => state.orders);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -116,6 +117,7 @@ export default function Invoices() {
     useEffect(() => {
         dispatch(fetchCompanyInfo());
         dispatch(fetchOrders({}));
+        dispatch(fetchInvoicedOrderIds());
     }, [dispatch]);
 
     useEffect(() => {
@@ -130,10 +132,7 @@ export default function Invoices() {
     const ordersWithoutInvoice = orders.filter(
         (order) =>
             (order.status === 'confirmed' || order.status === 'delivered') &&
-            !invoices.some((inv) => {
-                const orderId = typeof inv.order === 'string' ? inv.order : inv.order?._id;
-                return orderId === order._id;
-            })
+            !invoicedOrderIds.includes(order._id)
     );
 
     const filteredInvoices = invoices.filter((invoice) => {

@@ -16,6 +16,7 @@ interface InvoicesState {
         total: number;
         pages: number;
     };
+    invoicedOrderIds: string[];
 }
 
 const initialState: InvoicesState = {
@@ -30,6 +31,7 @@ const initialState: InvoicesState = {
         total: 0,
         pages: 0,
     },
+    invoicedOrderIds: [],
 };
 
 // Fetch all invoices
@@ -52,6 +54,19 @@ export const fetchInvoices = createAsyncThunk(
             return data.data;
         } catch (error) {
             return rejectWithValue('Failed to fetch invoices');
+        }
+    }
+);
+
+// Fetch order IDs that already have invoices (used to filter "orders ready for invoice" panel)
+export const fetchInvoicedOrderIds = createAsyncThunk(
+    'invoices/fetchInvoicedOrderIds',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await api.get('/invoices/invoiced-orders');
+            return response.data.data as string[];
+        } catch {
+            return rejectWithValue('Failed to fetch invoiced order IDs');
         }
     }
 );
@@ -220,6 +235,10 @@ const invoicesSlice = createSlice({
             .addCase(fetchCompanyInfo.fulfilled, (state, action: PayloadAction<CompanyInfo>) => {
                 state.companyInfo = action.payload;
             })
+            // Fetch Invoiced Order IDs
+            .addCase(fetchInvoicedOrderIds.fulfilled, (state, action: PayloadAction<string[]>) => {
+                state.invoicedOrderIds = action.payload;
+            })
             // Create Invoice
             .addCase(createInvoice.pending, (state) => {
                 state.loading = true;
@@ -229,6 +248,12 @@ const invoicesSlice = createSlice({
                 state.loading = false;
                 state.invoices.unshift(action.payload);
                 state.currentInvoice = action.payload;
+                const orderId = typeof action.payload.order === 'string'
+                    ? action.payload.order
+                    : action.payload.order?._id;
+                if (orderId && !state.invoicedOrderIds.includes(orderId)) {
+                    state.invoicedOrderIds.push(orderId);
+                }
             })
             .addCase(createInvoice.rejected, (state, action) => {
                 state.loading = false;

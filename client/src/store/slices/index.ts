@@ -31,6 +31,7 @@ export {
 export {
     default as invoicesReducer,
     fetchInvoices,
+    fetchInvoicedOrderIds,
     fetchInvoiceByOrder,
     fetchCompanyInfo,
     createInvoice,

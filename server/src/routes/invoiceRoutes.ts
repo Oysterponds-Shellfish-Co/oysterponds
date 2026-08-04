@@ -5,6 +5,7 @@ import {
     getInvoices,
     getInvoice,
     getInvoiceByOrder,
+    getInvoicedOrderIds,
     createInvoice,
     updateInvoice,
     updateInvoiceEmailStatus,
@@ -39,6 +40,7 @@ const updateInvoiceValidation = [
 
 // Routes
 router.get('/company-info', getCompanyInfo);
+router.get('/invoiced-orders', getInvoicedOrderIds);
 
 router.route('/')
     .get(getInvoices)

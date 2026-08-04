@@ -25,6 +25,21 @@ const getNextInvoiceNumber = async (): Promise<string> => {
     return `INV-${invoiceCounter.toString().padStart(5, '0')}`;
 };
 
+// @desc    Get order IDs that already have an invoice (for UI filtering)
+// @route   GET /api/invoices/invoiced-orders
+// @access  Private
+export const getInvoicedOrderIds = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const invoices = await Invoice.find({}, { order: 1, _id: 0 });
+    const orderIds = invoices.map((inv) => inv.order.toString());
+
+    const response: ApiResponse = {
+        success: true,
+        data: orderIds,
+    };
+
+    res.status(200).json(response);
+});
+
 // @desc    Get all invoices
 // @route   GET /api/invoices
 // @access  Private
