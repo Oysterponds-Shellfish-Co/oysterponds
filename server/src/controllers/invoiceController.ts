@@ -1,10 +1,35 @@
 import { Request, Response } from 'express';
-import { Invoice, Order, Customer } from '../models/index.js';
+import { Invoice, Order, Customer, Counter } from '../models/index.js';
 import { asyncHandler, AppError } from '../middleware/index.js';
 import { ApiResponse } from '../types/index.js';
 import { generateInvoicePDF, generateShippingTagPDF } from '../services/pdfService.js';
 import { sendInvoiceEmail } from '../services/emailService.js';
 
+
+// Persistent invoice counter stored in MongoDB — never drifts on server restart
+const getNextInvoiceNumber = async (): Promise<string> => {
+    // If counter doesn't exist yet, seed it from the current highest invoice number
+    const existing = await Counter.findOne({ name: 'invoice' });
+    if (!existing) {
+        const lastInvoice = await Invoice.findOne().sort({ invoiceNumber: -1 });
+        const currentMax = lastInvoice
+            ? parseInt(lastInvoice.invoiceNumber.replace('INV-', ''), 10)
+            : 16000;
+        try {
+            await Counter.create({ name: 'invoice', value: currentMax });
+        } catch {
+            // Another concurrent request already created it — that's fine
+        }
+    }
+
+    const updated = await Counter.findOneAndUpdate(
+        { name: 'invoice' },
+        { $inc: { value: 1 } },
+        { new: true }
+    );
+
+    return `INV-${updated!.value.toString().padStart(5, '0')}`;
+};
 
 // @desc    Get order IDs that already have an invoice (for UI filtering)
 // @route   GET /api/invoices/invoiced-orders
@@ -158,8 +183,8 @@ export const createInvoice = asyncHandler(async (req: Request, res: Response): P
         throw new AppError('Customer not found', 404);
     }
 
-    // Derive invoice number from order number so they always match
-    const invoiceNumber = `INV-${order.orderNumber}`;
+    // Generate invoice number from persistent DB counter (never drifts on restart)
+    const invoiceNumber = await getNextInvoiceNumber();
 
     // Create invoice
     const invoice = await Invoice.create({
