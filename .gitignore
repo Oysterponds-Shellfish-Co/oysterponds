@@ -31,3 +31,6 @@ server/coverage/
 # Uploads
 server/uploads/
 client/public/uploads/
+
+# Local DB backups
+db_backup/

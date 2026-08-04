@@ -5,25 +5,6 @@ import { ApiResponse } from '../types/index.js';
 import { generateInvoicePDF, generateShippingTagPDF } from '../services/pdfService.js';
 import { sendInvoiceEmail } from '../services/emailService.js';
 
-// Counter for invoice numbers (starting from 16000 as per client request)
-let invoiceCounter: number | null = null;
-
-// Initialize invoice counter from database
-const getNextInvoiceNumber = async (): Promise<string> => {
-    if (invoiceCounter === null) {
-        // Find the highest invoice number in the database
-        const lastInvoice = await Invoice.findOne().sort({ invoiceNumber: -1 });
-        if (lastInvoice) {
-            const lastNum = parseInt(lastInvoice.invoiceNumber.replace('INV-', ''), 10);
-            invoiceCounter = lastNum;
-        } else {
-            // Start from 16000 as per client request (first invoice will be 16001)
-            invoiceCounter = 16000;
-        }
-    }
-    invoiceCounter++;
-    return `INV-${invoiceCounter.toString().padStart(5, '0')}`;
-};
 
 // @desc    Get order IDs that already have an invoice (for UI filtering)
 // @route   GET /api/invoices/invoiced-orders
@@ -177,8 +158,8 @@ export const createInvoice = asyncHandler(async (req: Request, res: Response): P
         throw new AppError('Customer not found', 404);
     }
 
-    // Generate invoice number
-    const invoiceNumber = await getNextInvoiceNumber();
+    // Derive invoice number from order number so they always match
+    const invoiceNumber = `INV-${order.orderNumber}`;
 
     // Create invoice
     const invoice = await Invoice.create({
