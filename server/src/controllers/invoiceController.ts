@@ -50,7 +50,7 @@ export const getInvoicedOrderIds = asyncHandler(async (_req: Request, res: Respo
 // @route   GET /api/invoices
 // @access  Private
 export const getInvoices = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { customer, status, startDate, endDate, limit = 50, page = 1 } = req.query;
+    const { customer, status, startDate, endDate, search, limit = 50, page = 1 } = req.query;
 
     const filter: Record<string, unknown> = {};
 
@@ -60,6 +60,13 @@ export const getInvoices = asyncHandler(async (req: Request, res: Response): Pro
 
     if (status) {
         filter.status = status;
+    }
+
+    if (search) {
+        filter.$or = [
+            { invoiceNumber: { $regex: search, $options: 'i' } },
+            { customerName: { $regex: search, $options: 'i' } },
+        ];
     }
 
     if (startDate || endDate) {

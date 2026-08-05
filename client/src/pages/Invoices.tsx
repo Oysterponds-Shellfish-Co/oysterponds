@@ -124,8 +124,9 @@ export default function Invoices() {
         dispatch(fetchInvoices({
             page: currentPage,
             status: statusFilter !== 'all' ? statusFilter : undefined,
+            search: searchQuery || undefined,
         }));
-    }, [dispatch, currentPage, statusFilter]);
+    }, [dispatch, currentPage, statusFilter, searchQuery]);
 
     // Filter to get CONFIRMED orders without invoices
     // (Invoices can be generated before delivery - client requirement)
@@ -135,12 +136,7 @@ export default function Invoices() {
             !invoicedOrderIds.includes(order._id)
     );
 
-    const filteredInvoices = invoices.filter((invoice) => {
-        return (
-            invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    });
+    const filteredInvoices = invoices;
 
     // Helper to format hour/minute/period into readable time string
     const formatTimeParts = (hour: string, minute: string, period: string): string => {
@@ -344,7 +340,7 @@ export default function Invoices() {
                                     <Input
                                         placeholder="Search by invoice # or customer..."
                                         value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                                         className="pl-10"
                                     />
                                 </div>

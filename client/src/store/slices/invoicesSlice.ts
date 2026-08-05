@@ -37,12 +37,13 @@ const initialState: InvoicesState = {
 // Fetch all invoices
 export const fetchInvoices = createAsyncThunk(
     'invoices/fetchInvoices',
-    async (params: { customer?: string; status?: string; page?: number } | undefined, { rejectWithValue }) => {
+    async (params: { customer?: string; status?: string; page?: number; search?: string } | undefined, { rejectWithValue }) => {
         try {
             const queryParams = new URLSearchParams();
             if (params?.customer) queryParams.append('customer', params.customer);
             if (params?.status) queryParams.append('status', params.status);
             if (params?.page) queryParams.append('page', params.page.toString());
+            if (params?.search) queryParams.append('search', params.search);
 
             const response = await api.get(`/invoices?${queryParams}`);
             const data = response.data;
