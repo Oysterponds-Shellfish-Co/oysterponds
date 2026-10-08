@@ -178,7 +178,7 @@ export interface PublicOrderForm {
 }
 
 // Invoice Types
-export type InvoiceStatus = 'draft' | 'sent' | 'paid';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 
 export interface IInvoiceItem {
     product: string;
@@ -218,6 +218,8 @@ export interface IInvoice {
     paidAt?: string;
     checkNumber?: string;
     checkDate?: string;
+    checkAmount?: number;
+    paymentMethod?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -231,6 +233,7 @@ export interface CreateInvoiceForm {
     departureTemperature: string;
     timeOnTruck: string;
     deliveredBy: string;
+    [key: string]: unknown;
 }
 
 export interface CompanyInfo {

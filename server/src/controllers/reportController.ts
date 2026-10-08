@@ -16,7 +16,8 @@ export const getSalesSummary = asyncHandler(async (req: Request, res: Response):
     const yearEnd = new Date(selectedYear + 1, 0, 1);
 
     const invoices = await Invoice.find({
-        createdAt: { $gte: yearStart, $lt: yearEnd }
+        createdAt: { $gte: yearStart, $lt: yearEnd },
+        status: { $ne: 'cancelled' },
     });
 
     // Calculate totals
@@ -86,13 +87,14 @@ export const getInvoiceSummary = asyncHandler(async (req: Request, res: Response
     const yearEnd = new Date(selectedYear + 1, 0, 1);
 
     const invoices = await Invoice.find({
-        createdAt: { $gte: yearStart, $lt: yearEnd }
+        createdAt: { $gte: yearStart, $lt: yearEnd },
     });
 
     const summary = {
         draft: { count: 0, total: 0 },
         sent: { count: 0, total: 0 },
-        paid: { count: 0, total: 0 }
+        paid: { count: 0, total: 0 },
+        cancelled: { count: 0, total: 0 },
     };
 
     invoices.forEach(inv => {
@@ -103,7 +105,7 @@ export const getInvoiceSummary = asyncHandler(async (req: Request, res: Response
         }
     });
 
-    // Calculate A/R (Accounts Receivable) - unpaid invoices (sent but not paid)
+    // A/R = sent but not paid (excluding cancelled)
     const arTotal = summary.sent.total;
 
     const response: ApiResponse = {
@@ -112,8 +114,8 @@ export const getInvoiceSummary = asyncHandler(async (req: Request, res: Response
             year: selectedYear,
             ...summary,
             arTotal,
-            totalInvoices: invoices.length,
-            totalRevenue: invoices.reduce((sum, inv) => sum + inv.total, 0)
+            totalInvoices: invoices.filter(inv => inv.status !== 'cancelled').length,
+            totalRevenue: invoices.filter(inv => inv.status !== 'cancelled').reduce((sum, inv) => sum + inv.total, 0)
         }
     };
 
@@ -131,7 +133,8 @@ export const getCustomerAnalytics = asyncHandler(async (req: Request, res: Respo
     const yearEnd = new Date(selectedYear + 1, 0, 1);
 
     const invoices = await Invoice.find({
-        createdAt: { $gte: yearStart, $lt: yearEnd }
+        createdAt: { $gte: yearStart, $lt: yearEnd },
+        status: { $ne: 'cancelled' },
     }).populate('customer', 'businessName');
 
     // Group by customer

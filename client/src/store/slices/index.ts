@@ -38,6 +38,7 @@ export {
     updateInvoice,
     sendInvoiceEmail,
     markInvoiceAsPaid,
+    voidInvoice,
     getInvoicePDFUrl,
     clearCurrentInvoice,
     clearError as clearInvoicesError

@@ -11,6 +11,10 @@ import {
     RefreshCw,
     Calendar,
     DollarSign,
+    Ban,
+    Pencil,
+    Plus,
+    Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,11 +44,13 @@ import {
     createInvoice,
     sendInvoiceEmail,
     markInvoiceAsPaid,
+    voidInvoice,
+    updateInvoice,
     getInvoicePDFUrl,
 } from '@/store/slices';
-import { fetchOrders } from '@/store/slices';
+import { fetchOrders, fetchCustomerPricing } from '@/store/slices';
 import { formatCurrency, formatDate } from '@/utils/helpers';
-import { IOrder, CreateInvoiceForm, IInvoice } from '@/types';
+import { IOrder, CreateInvoiceForm, IInvoice, IInvoiceItem } from '@/types';
 import { toast } from 'sonner';
 
 const containerVariants = {
@@ -64,18 +70,21 @@ const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-800 border-gray-200',
     sent: 'bg-green-100 text-green-800 border-green-200',
     paid: 'bg-primary/10 text-primary border-primary/20',
+    cancelled: 'bg-red-100 text-red-700 border-red-200',
 };
 
 const statusIcons: Record<string, React.ReactNode> = {
     draft: <Clock className="w-3 h-3" />,
     sent: <Mail className="w-3 h-3" />,
     paid: <Check className="w-3 h-3" />,
+    cancelled: <Ban className="w-3 h-3" />,
 };
 
 export default function Invoices() {
     const dispatch = useAppDispatch();
     const { invoices, loading, companyInfo, pagination, invoicedOrderIds } = useAppSelector((state) => state.invoices);
     const { items: orders } = useAppSelector((state) => state.orders);
+    const { customerPricing, pricingLoading } = useAppSelector((state) => state.customers);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -90,9 +99,23 @@ export default function Invoices() {
     const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<IInvoice | null>(null);
     const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [checkNumber, setCheckNumber] = useState('');
+    const [checkDate, setCheckDate] = useState(new Date().toISOString().split('T')[0]);
+    const [checkAmount, setCheckAmount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('');
     const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
-    // Separate state for temperature (number) and time on truck
+    // Edit invoice modal state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<IInvoice | null>(null);
+    const [editItems, setEditItems] = useState<IInvoiceItem[]>([]);
+    const [editBillTo, setEditBillTo] = useState({ businessName: '', attention: '', address: { street: '', city: '', state: 'NY', zip: '' } });
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    // Void confirm modal state
+    const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
+    const [selectedInvoiceForVoid, setSelectedInvoiceForVoid] = useState<IInvoice | null>(null);
+    const [isVoiding, setIsVoiding] = useState(false);
+
     const [temperatureValue, setTemperatureValue] = useState<number | ''>('');
     const [truckStartHour, setTruckStartHour] = useState('9');
     const [truckStartMinute, setTruckStartMinute] = useState('00');
@@ -100,11 +123,8 @@ export default function Invoices() {
     const [truckEndHour, setTruckEndHour] = useState('10');
     const [truckEndMinute, setTruckEndMinute] = useState('00');
     const [truckEndPeriod, setTruckEndPeriod] = useState('AM');
-
-    // Harvest time state — free-text input (e.g. "6:47 AM")
     const [harvestTimeText, setHarvestTimeText] = useState('');
 
-    // Invoice form state
     const [invoiceForm, setInvoiceForm] = useState<CreateInvoiceForm>({
         orderId: '',
         harvestDate: new Date().toISOString().split('T')[0],
@@ -128,8 +148,6 @@ export default function Invoices() {
         }));
     }, [dispatch, currentPage, statusFilter, searchQuery]);
 
-    // Filter to get CONFIRMED orders without invoices
-    // (Invoices can be generated before delivery - client requirement)
     const ordersWithoutInvoice = orders.filter(
         (order) =>
             (order.status === 'confirmed' || order.status === 'delivered') &&
@@ -138,7 +156,6 @@ export default function Invoices() {
 
     const filteredInvoices = invoices;
 
-    // Helper to format hour/minute/period into readable time string
     const formatTimeParts = (hour: string, minute: string, period: string): string => {
         return `${hour}:${minute} ${period}`;
     };
@@ -146,7 +163,6 @@ export default function Invoices() {
     const handleCreateInvoice = async () => {
         if (!selectedOrder) return;
 
-        // Validate temperature
         if (temperatureValue === '' || temperatureValue === undefined) {
             toast.error('Please enter the departure temperature');
             return;
@@ -157,7 +173,6 @@ export default function Invoices() {
             return;
         }
 
-        // Format the values
         const formattedTemperature = `${temperatureValue}°F`;
         const formattedTimeOnTruck = `${formatTimeParts(truckStartHour, truckStartMinute, truckStartPeriod)} - ${formatTimeParts(truckEndHour, truckEndMinute, truckEndPeriod)}`;
 
@@ -235,7 +250,6 @@ export default function Invoices() {
             timeOnTruck: '',
             deliveredBy: '',
         });
-        // Pre-fill harvest time text from order if available
         setHarvestTimeText(order.harvestTime || '');
         setIsCreateModalOpen(true);
     };
@@ -243,7 +257,10 @@ export default function Invoices() {
     const openMarkPaidModal = (invoice: IInvoice) => {
         setSelectedInvoiceForPayment(invoice);
         setPaymentDate(new Date().toISOString().split('T')[0]);
+        setCheckDate(new Date().toISOString().split('T')[0]);
         setCheckNumber('');
+        setCheckAmount('');
+        setPaymentMethod('');
         setIsMarkPaidModalOpen(true);
     };
 
@@ -256,15 +273,121 @@ export default function Invoices() {
                 invoiceId: selectedInvoiceForPayment._id,
                 checkNumber: checkNumber || undefined,
                 paidAt: paymentDate || undefined,
+                checkDate: checkDate || undefined,
+                checkAmount: checkAmount ? Number(checkAmount) : undefined,
+                paymentMethod: paymentMethod || undefined,
             })).unwrap();
 
             toast.success('Invoice marked as paid!');
             setIsMarkPaidModalOpen(false);
             setSelectedInvoiceForPayment(null);
-        } catch (error) {
+        } catch {
             toast.error('Failed to mark invoice as paid');
         } finally {
             setIsMarkingPaid(false);
+        }
+    };
+
+    const openVoidModal = (invoice: IInvoice) => {
+        setSelectedInvoiceForVoid(invoice);
+        setIsVoidModalOpen(true);
+    };
+
+    const handleVoidInvoice = async () => {
+        if (!selectedInvoiceForVoid) return;
+        setIsVoiding(true);
+        try {
+            await dispatch(voidInvoice(selectedInvoiceForVoid._id)).unwrap();
+            toast.success(`${selectedInvoiceForVoid.invoiceNumber} voided`);
+            setIsVoidModalOpen(false);
+            setSelectedInvoiceForVoid(null);
+        } catch {
+            toast.error('Failed to void invoice');
+        } finally {
+            setIsVoiding(false);
+        }
+    };
+
+    const openEditModal = (invoice: IInvoice) => {
+        setSelectedInvoiceForEdit(invoice);
+        setEditItems(invoice.items.map(item => ({ ...item })));
+        setEditBillTo({
+            businessName: invoice.billTo?.businessName || '',
+            attention: invoice.billTo?.attention || '',
+            address: {
+                street: invoice.billTo?.address?.street || '',
+                city: invoice.billTo?.address?.city || '',
+                state: invoice.billTo?.address?.state || 'NY',
+                zip: invoice.billTo?.address?.zip || '',
+            },
+        });
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?._id;
+        if (customerId) dispatch(fetchCustomerPricing(customerId));
+        setIsEditModalOpen(true);
+    };
+
+    const handleEditItem = (index: number, field: keyof IInvoiceItem, value: string | number) => {
+        setEditItems(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], [field]: value };
+            if (field === 'quantity' || field === 'pricePerUnit') {
+                updated[index].lineTotal = Number(updated[index].quantity) * Number(updated[index].pricePerUnit);
+            }
+            return updated;
+        });
+    };
+
+    const handleSelectProduct = (index: number, productId: string) => {
+        const pricing = customerPricing.find(p => p.productId === productId);
+        if (!pricing) return;
+        setEditItems(prev => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                product: productId,
+                productName: pricing.productName,
+                pricePerUnit: pricing.price,
+                lineTotal: Number(updated[index].quantity) * pricing.price,
+            };
+            return updated;
+        });
+    };
+
+    const handleAddItem = () => {
+        setEditItems(prev => [...prev, { product: '', productName: '', quantity: 1, pricePerUnit: 0, lineTotal: 0 }]);
+    };
+
+    const handleRemoveItem = (index: number) => {
+        setEditItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const editSubtotal = editItems.reduce((sum, item) => sum + (item.quantity * item.pricePerUnit), 0);
+    const editTotal = editSubtotal + (selectedInvoiceForEdit?.tax || 0);
+
+    const handleSaveEdit = async () => {
+        if (!selectedInvoiceForEdit) return;
+        if (editItems.length === 0) {
+            toast.error('Invoice must have at least one item');
+            return;
+        }
+        setIsSavingEdit(true);
+        try {
+            await dispatch(updateInvoice({
+                id: selectedInvoiceForEdit._id,
+                updates: {
+                    items: editItems,
+                    subtotal: editSubtotal,
+                    total: editTotal,
+                    billTo: editBillTo,
+                },
+            })).unwrap();
+            toast.success('Invoice updated successfully');
+            setIsEditModalOpen(false);
+            setSelectedInvoiceForEdit(null);
+        } catch {
+            toast.error('Failed to update invoice');
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
@@ -353,6 +476,7 @@ export default function Invoices() {
                                         <SelectItem value="draft">Draft</SelectItem>
                                         <SelectItem value="sent">Sent</SelectItem>
                                         <SelectItem value="paid">Paid</SelectItem>
+                                        <SelectItem value="cancelled">Cancelled</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -375,7 +499,7 @@ export default function Invoices() {
                                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                                 <h3 className="text-lg font-semibold mb-2">No Invoices Yet</h3>
                                 <p className="text-muted-foreground mb-4">
-                                    Confirm an order first, then use the &ldquo;Orders Ready for Invoice&rdquo; panel above to generate an invoice — you can print or email it right away, before or after delivery.
+                                    Confirm an order first, then use the &ldquo;Orders Ready for Invoice&rdquo; panel above to generate an invoice.
                                 </p>
                             </CardContent>
                         </Card>
@@ -397,9 +521,9 @@ export default function Invoices() {
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {filteredInvoices.map((invoice) => (
-                                            <tr key={invoice._id} className="hover:bg-muted/30 transition-colors">
+                                            <tr key={invoice._id} className={`hover:bg-muted/30 transition-colors ${invoice.status === 'cancelled' ? 'opacity-60' : ''}`}>
                                                 <td className="p-4">
-                                                    <span className="font-mono font-semibold text-primary">
+                                                    <span className={`font-mono font-semibold ${invoice.status === 'cancelled' ? 'line-through text-muted-foreground' : 'text-primary'}`}>
                                                         {invoice.invoiceNumber}
                                                     </span>
                                                 </td>
@@ -434,7 +558,8 @@ export default function Invoices() {
                                                             <Download className="w-4 h-4" />
                                                             Print
                                                         </Button>
-                                                        {/* Email — available for draft and re-sendable for sent */}
+
+                                                        {/* Email — for draft and sent (not cancelled/paid) */}
                                                         {(invoice.status === 'draft' || invoice.status === 'sent') && (
                                                             <Button
                                                                 variant="outline"
@@ -452,7 +577,9 @@ export default function Invoices() {
                                                                 {invoice.status === 'sent' ? 'Re-send' : 'Email'}
                                                             </Button>
                                                         )}
-                                                        {invoice.status === 'sent' && invoice.emailSentAt && (
+
+                                                        {/* Mark as Paid — draft or sent (Feature 4) */}
+                                                        {(invoice.status === 'draft' || invoice.status === 'sent') && (
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
@@ -463,10 +590,49 @@ export default function Invoices() {
                                                                 <DollarSign className="w-4 h-4" />
                                                             </Button>
                                                         )}
+
+                                                        {/* Paid info */}
                                                         {invoice.status === 'paid' && (
-                                                            <span className="text-xs text-green-600 font-medium">
-                                                                Paid {invoice.paidAt ? formatDate(invoice.paidAt) : ''}
-                                                            </span>
+                                                            <div className="text-right">
+                                                                <span className="text-xs text-green-600 font-medium block">
+                                                                    Paid {invoice.paidAt ? formatDate(invoice.paidAt) : ''}
+                                                                </span>
+                                                                {invoice.paymentMethod && (
+                                                                    <span className="text-xs text-muted-foreground block">{invoice.paymentMethod}</span>
+                                                                )}
+                                                                {invoice.checkNumber && (
+                                                                    <span className="text-xs text-muted-foreground block">#{invoice.checkNumber}</span>
+                                                                )}
+                                                                {invoice.checkAmount ? (
+                                                                    <span className="text-xs text-muted-foreground block">{formatCurrency(invoice.checkAmount)}</span>
+                                                                ) : null}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Edit — for non-cancelled invoices (Feature 2) */}
+                                                        {invoice.status !== 'cancelled' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => openEditModal(invoice)}
+                                                                title="Edit Invoice"
+                                                                className="text-muted-foreground hover:text-foreground"
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+
+                                                        {/* Void — for non-cancelled invoices (Feature 3) */}
+                                                        {invoice.status !== 'cancelled' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => openVoidModal(invoice)}
+                                                                title="Void / Cancel Invoice"
+                                                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                            >
+                                                                <Ban className="w-4 h-4" />
+                                                            </Button>
                                                         )}
                                                     </div>
                                                 </td>
@@ -525,7 +691,6 @@ export default function Invoices() {
 
                     {selectedOrder && (
                         <div className="space-y-4">
-                            {/* Order Summary */}
                             <div className="p-3 bg-muted/50 rounded-lg">
                                 <div className="flex justify-between">
                                     <span className="text-sm text-muted-foreground">Order</span>
@@ -543,7 +708,6 @@ export default function Invoices() {
                                 </div>
                             </div>
 
-                            {/* Invoice Details Form */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>Harvest Date</Label>
@@ -712,7 +876,6 @@ export default function Invoices() {
 
                     {selectedInvoiceForPayment && (
                         <div className="space-y-4">
-                            {/* Invoice Info */}
                             <div className="p-3 bg-muted/50 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <span className="font-mono font-semibold text-primary">
@@ -727,26 +890,59 @@ export default function Invoices() {
                                 </p>
                             </div>
 
-                            {/* Payment Date */}
-                            <div className="space-y-2">
-                                <Label htmlFor="paymentDate">Payment Date</Label>
-                                <Input
-                                    id="paymentDate"
-                                    type="date"
-                                    value={paymentDate}
-                                    onChange={(e) => setPaymentDate(e.target.value)}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="paymentDate">Payment Date</Label>
+                                    <Input
+                                        id="paymentDate"
+                                        type="date"
+                                        value={paymentDate}
+                                        onChange={(e) => setPaymentDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                                    <Input
+                                        id="paymentMethod"
+                                        type="text"
+                                        placeholder="e.g. Check, ACH, Cash"
+                                        value={paymentMethod}
+                                        onChange={(e) => setPaymentMethod(e.target.value)}
+                                    />
+                                </div>
                             </div>
 
-                            {/* Payment Method & Date */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="checkNumber">Check Number</Label>
+                                    <Input
+                                        id="checkNumber"
+                                        type="text"
+                                        placeholder="e.g. 1234"
+                                        value={checkNumber}
+                                        onChange={(e) => setCheckNumber(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="checkAmount">Check Amount</Label>
+                                    <Input
+                                        id="checkAmount"
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={checkAmount}
+                                        onChange={(e) => setCheckAmount(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="checkNumber">Payment Method & Date</Label>
+                                <Label htmlFor="checkDate">Check Date</Label>
                                 <Input
-                                    id="checkNumber"
-                                    type="text"
-                                    placeholder="e.g. ACH 2/25, Check #1234, Cash"
-                                    value={checkNumber}
-                                    onChange={(e) => setCheckNumber(e.target.value)}
+                                    id="checkDate"
+                                    type="date"
+                                    value={checkDate}
+                                    onChange={(e) => setCheckDate(e.target.value)}
                                 />
                             </div>
                         </div>
@@ -759,6 +955,204 @@ export default function Invoices() {
                         <Button onClick={handleMarkAsPaid} disabled={isMarkingPaid} className="bg-green-600 hover:bg-green-700">
                             {isMarkingPaid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
                             Mark as Paid
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Invoice Modal */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Invoice {selectedInvoiceForEdit?.invoiceNumber}</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedInvoiceForEdit && (
+                        <div className="space-y-6">
+                            {/* Bill To */}
+                            <div>
+                                <h4 className="font-semibold text-sm mb-3">Bill To</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label>Business Name</Label>
+                                        <Input
+                                            value={editBillTo.businessName}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, businessName: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Attention</Label>
+                                        <Input
+                                            value={editBillTo.attention}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, attention: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Street</Label>
+                                        <Input
+                                            value={editBillTo.address.street}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, address: { ...prev.address, street: e.target.value } }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>City</Label>
+                                        <Input
+                                            value={editBillTo.address.city}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, address: { ...prev.address, city: e.target.value } }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>State</Label>
+                                        <Input
+                                            value={editBillTo.address.state}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, address: { ...prev.address, state: e.target.value } }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Zip</Label>
+                                        <Input
+                                            value={editBillTo.address.zip}
+                                            onChange={(e) => setEditBillTo(prev => ({ ...prev, address: { ...prev.address, zip: e.target.value } }))}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Line Items */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="font-semibold text-sm">Line Items</h4>
+                                    <Button variant="outline" size="sm" onClick={handleAddItem}>
+                                        <Plus className="w-3 h-3 mr-1" /> Add Item
+                                    </Button>
+                                </div>
+                                <div className="space-y-2">
+                                    {editItems.map((item, index) => (
+                                        <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 bg-muted/30 rounded-lg">
+                                            <div className="col-span-5">
+                                                {pricingLoading ? (
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
+                                                        <Loader2 className="w-3 h-3 animate-spin" /> Loading...
+                                                    </div>
+                                                ) : customerPricing.length > 0 ? (
+                                                    <Select
+                                                        value={item.product || ''}
+                                                        onValueChange={(val) => handleSelectProduct(index, val)}
+                                                    >
+                                                        <SelectTrigger className="text-sm">
+                                                            <SelectValue placeholder="Select product" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {customerPricing.map(p => (
+                                                                <SelectItem key={p.productId} value={p.productId}>
+                                                                    {p.productName} — {formatCurrency(p.price)}/{p.unit}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Input
+                                                        placeholder="Product name"
+                                                        value={item.productName}
+                                                        onChange={(e) => handleEditItem(index, 'productName', e.target.value)}
+                                                        className="text-sm"
+                                                    />
+                                                )}
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Qty"
+                                                    value={item.quantity}
+                                                    min={1}
+                                                    onChange={(e) => handleEditItem(index, 'quantity', Number(e.target.value))}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    placeholder="Price"
+                                                    value={item.pricePerUnit}
+                                                    onChange={(e) => handleEditItem(index, 'pricePerUnit', Number(e.target.value))}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <div className="col-span-2 text-sm font-medium text-right">
+                                                {formatCurrency(item.quantity * item.pricePerUnit)}
+                                            </div>
+                                            <div className="col-span-1 flex justify-end">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRemoveItem(index)}
+                                                    className="text-red-500 hover:text-red-600 h-7 w-7"
+                                                    disabled={editItems.length === 1}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Totals */}
+                                <div className="mt-4 space-y-1 border-t pt-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Subtotal</span>
+                                        <span>{formatCurrency(editSubtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Tax</span>
+                                        <span>{formatCurrency(selectedInvoiceForEdit.tax || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-semibold">
+                                        <span>Total</span>
+                                        <span>{formatCurrency(editTotal)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+                            {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Void Confirm Modal */}
+            <Dialog open={isVoidModalOpen} onOpenChange={setIsVoidModalOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Void Invoice</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                            Are you sure you want to void <span className="font-mono font-semibold text-foreground">{selectedInvoiceForVoid?.invoiceNumber}</span>?
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            The invoice will remain in history but will be marked as Cancelled and excluded from all sales and A/R totals.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsVoidModalOpen(false)}>
+                            Keep Invoice
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleVoidInvoice}
+                            disabled={isVoiding}
+                        >
+                            {isVoiding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Ban className="w-4 h-4 mr-2" />}
+                            Void Invoice
                         </Button>
                     </DialogFooter>
                 </DialogContent>

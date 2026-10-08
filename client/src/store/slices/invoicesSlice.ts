@@ -170,9 +170,16 @@ export const sendInvoiceEmail = createAsyncThunk(
 // Mark invoice as paid
 export const markInvoiceAsPaid = createAsyncThunk(
     'invoices/markInvoiceAsPaid',
-    async ({ invoiceId, checkNumber, paidAt }: { invoiceId: string; checkNumber?: string; paidAt?: string }, { rejectWithValue }) => {
+    async ({ invoiceId, checkNumber, paidAt, checkDate, checkAmount, paymentMethod }: {
+        invoiceId: string;
+        checkNumber?: string;
+        paidAt?: string;
+        checkDate?: string;
+        checkAmount?: number;
+        paymentMethod?: string;
+    }, { rejectWithValue }) => {
         try {
-            const response = await api.put(`/invoices/${invoiceId}/mark-paid`, { checkNumber, paidAt });
+            const response = await api.put(`/invoices/${invoiceId}/mark-paid`, { checkNumber, paidAt, checkDate, checkAmount, paymentMethod });
 
             const data = response.data;
             if (!data.success) {
@@ -182,6 +189,21 @@ export const markInvoiceAsPaid = createAsyncThunk(
             return data.data;
         } catch (error) {
             return rejectWithValue('Failed to mark invoice as paid');
+        }
+    }
+);
+
+// Void (cancel) an invoice
+export const voidInvoice = createAsyncThunk(
+    'invoices/voidInvoice',
+    async (invoiceId: string, { rejectWithValue }) => {
+        try {
+            const response = await api.put(`/invoices/${invoiceId}`, { status: 'cancelled' });
+            const data = response.data;
+            if (!data.success) return rejectWithValue(data.error || 'Failed to void invoice');
+            return data.data as IInvoice;
+        } catch {
+            return rejectWithValue('Failed to void invoice');
         }
     }
 );
@@ -304,7 +326,12 @@ const invoicesSlice = createSlice({
             .addCase(markInvoiceAsPaid.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
-            });
+            })
+            // Void Invoice
+            .addCase(voidInvoice.fulfilled, (state, action: PayloadAction<IInvoice>) => {
+                const index = state.invoices.findIndex((inv) => inv._id === action.payload._id);
+                if (index !== -1) state.invoices[index] = action.payload;
+            })
     },
 });
 

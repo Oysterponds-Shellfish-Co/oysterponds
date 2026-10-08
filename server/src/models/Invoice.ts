@@ -10,7 +10,7 @@ export interface IInvoiceItem {
 }
 
 // Invoice status enum
-export type InvoiceStatus = 'draft' | 'sent' | 'paid';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 
 // Invoice document interface
 export interface IInvoiceDocument extends Document {
@@ -59,6 +59,8 @@ export interface IInvoiceDocument extends Document {
     paidAt: Date;
     checkNumber: string;
     checkDate: Date;
+    checkAmount: number;
+    paymentMethod: string;
 
     // Timestamps
     createdAt: Date;
@@ -176,7 +178,7 @@ const invoiceSchema = new Schema<IInvoiceDocument>(
         },
         status: {
             type: String,
-            enum: ['draft', 'sent', 'paid'],
+            enum: ['draft', 'sent', 'paid', 'cancelled'],
             default: 'draft',
         },
         pdfPath: {
@@ -199,6 +201,14 @@ const invoiceSchema = new Schema<IInvoiceDocument>(
         },
         checkDate: {
             type: Date,
+        },
+        checkAmount: {
+            type: Number,
+            default: 0,
+        },
+        paymentMethod: {
+            type: String,
+            default: '',
         },
     },
     {

@@ -35,7 +35,7 @@ const updateInvoiceValidation = [
     body('departureTemperature').optional().isString(),
     body('timeOnTruck').optional().isString(),
     body('deliveredBy').optional().isString(),
-    body('status').optional().isIn(['draft', 'sent', 'paid']).withMessage('Invalid status'),
+    body('status').optional().isIn(['draft', 'sent', 'paid', 'cancelled']).withMessage('Invalid status'),
 ];
 
 // Routes

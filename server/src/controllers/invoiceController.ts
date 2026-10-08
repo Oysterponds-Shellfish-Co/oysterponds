@@ -262,6 +262,12 @@ export const updateInvoice = asyncHandler(async (req: Request, res: Response): P
         'timeOnTruck',
         'deliveredBy',
         'status',
+        'items',
+        'subtotal',
+        'tax',
+        'total',
+        'customerName',
+        'billTo',
     ];
 
     const updates: Record<string, unknown> = {};
@@ -270,6 +276,18 @@ export const updateInvoice = asyncHandler(async (req: Request, res: Response): P
             updates[key] = req.body[key];
         }
     });
+
+    // Recalculate totals if items are being updated
+    if (updates.items && Array.isArray(updates.items)) {
+        const items = updates.items as Array<{ quantity: number; pricePerUnit: number; lineTotal?: number }>;
+        const recalculated = items.map((item) => ({
+            ...item,
+            lineTotal: item.quantity * item.pricePerUnit,
+        }));
+        updates.items = recalculated;
+        updates.subtotal = recalculated.reduce((sum, item) => sum + item.lineTotal, 0);
+        updates.total = (updates.subtotal as number) + ((updates.tax as number) || invoice.tax);
+    }
 
     const updatedInvoice = await Invoice.findByIdAndUpdate(
         req.params.id,
@@ -315,7 +333,7 @@ export const updateInvoiceEmailStatus = asyncHandler(async (req: Request, res: R
 // @route   PUT /api/invoices/:id/mark-paid
 // @access  Private
 export const markInvoiceAsPaid = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { checkNumber, paidAt } = req.body;
+    const { checkNumber, paidAt, checkAmount, paymentMethod, checkDate } = req.body;
 
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) {
@@ -325,6 +343,9 @@ export const markInvoiceAsPaid = asyncHandler(async (req: Request, res: Response
     invoice.status = 'paid';
     invoice.paidAt = paidAt ? new Date(paidAt) : new Date();
     invoice.checkNumber = checkNumber || '';
+    invoice.checkDate = checkDate ? new Date(checkDate) : new Date(paidAt || Date.now());
+    invoice.checkAmount = checkAmount ? Number(checkAmount) : 0;
+    invoice.paymentMethod = paymentMethod || '';
     await invoice.save();
 
     const response: ApiResponse = {
